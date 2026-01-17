@@ -169,19 +169,36 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
           children: [
             const Text('배액백 선택'),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _bagValue,
-              items: const [
-                DropdownMenuItem(value: '배액백', child: Text('배액백')),
-                DropdownMenuItem(value: '1.5', child: Text('1.5')),
-                DropdownMenuItem(value: '2.3', child: Text('2.3')),
-                DropdownMenuItem(value: '4.3', child: Text('4.3')),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _BagRadio(
+                  label: '배액백',
+                  value: '배액백',
+                  groupValue: _bagValue,
+                  onChanged: _setBagValue,
+                ),
+                _BagRadio(
+                  label: '1.5',
+                  value: '1.5',
+                  groupValue: _bagValue,
+                  onChanged: _setBagValue,
+                ),
+                _BagRadio(
+                  label: '2.3',
+                  value: '2.3',
+                  groupValue: _bagValue,
+                  onChanged: _setBagValue,
+                ),
+                _BagRadio(
+                  label: '4.3',
+                  value: '4.3',
+                  groupValue: _bagValue,
+                  onChanged: _setBagValue,
+                ),
               ],
-              onChanged: (value) {
-                if (value != null) {
-                  _setBagValue(value);
-                }
-              },
             ),
             const SizedBox(height: 16),
             const Text('날짜와 시간'),
@@ -297,6 +314,55 @@ class _DialysisRowCard extends StatelessWidget {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BagRadio extends StatelessWidget {
+  const _BagRadio({
+    required this.label,
+    required this.value,
+    required this.groupValue,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final String groupValue;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () => onChanged(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: value == groupValue ? Colors.blue.shade50 : Colors.transparent,
+          border: Border.all(
+            color: value == groupValue ? Colors.blue : Colors.grey.shade400,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Radio<String>(
+              value: value,
+              groupValue: groupValue,
+              onChanged: (selected) {
+                if (selected != null) {
+                  onChanged(selected);
+                }
+              },
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
+            Text(label),
           ],
         ),
       ),

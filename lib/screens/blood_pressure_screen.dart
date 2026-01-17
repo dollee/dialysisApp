@@ -89,6 +89,7 @@ class _BloodPressureScreenState extends State<BloodPressureScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('저장되었습니다.')),
         );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } finally {
       if (mounted) setState(() => _saving = false);

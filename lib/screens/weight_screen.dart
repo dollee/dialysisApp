@@ -74,6 +74,7 @@ class _WeightScreenState extends State<WeightScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('저장되었습니다.')),
         );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
