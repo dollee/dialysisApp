@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/settings_screen.dart';
 import 'state/app_state.dart';
 
 void main() {
@@ -55,22 +56,67 @@ class DialysisApp extends StatelessWidget {
   }
 }
 
-class AuthGate extends StatelessWidget {
+class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool? _hasProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkProfile();
+  }
+
+  Future<void> _checkProfile() async {
+    final hasProfile = await context.read<AppState>().hasRequiredProfile();
+    if (mounted) {
+      setState(() {
+        _hasProfile = hasProfile;
+      });
+    }
+  }
+
+  void _handleProfileCompleted() {
+    setState(() {
+      _hasProfile = true;
+    });
+    // 설정 완료 후 로그인/홈 화면으로 부드럽게 전환
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, _) {
-        if (state.isInitializing) {
-          return const Scaffold(
+        late final Widget screen;
+        if (state.isInitializing || _hasProfile == null) {
+          screen = const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
+        } else if (_hasProfile == false) {
+          screen = SettingsScreen(
+            requireProfile: true,
+            onCompleted: _handleProfileCompleted,
+          );
+        } else if (!state.isSignedIn) {
+          screen = const LoginScreen();
+        } else {
+          screen = const HomeScreen();
         }
-        if (!state.isSignedIn) {
-          return const LoginScreen();
-        }
-        return const HomeScreen();
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: KeyedSubtree(
+            key: ValueKey(screen.runtimeType),
+            child: screen,
+          ),
+        );
       },
     );
   }

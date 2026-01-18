@@ -43,6 +43,12 @@
 	<string>체중과 혈압 데이터를 읽기 위해 건강 데이터 접근이 필요합니다.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>체중과 혈압 데이터를 저장하기 위해 건강 데이터 접근이 필요합니다.</string>
+	<key>NSContactsUsageDescription</key>
+	<string>배송 요청 전화번호를 주소록에서 불러오기 위해 연락처 접근이 필요합니다.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>기계투석 자동입력을 위해 카메라 접근이 필요합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>기계투석 자동입력을 위해 사진 접근이 필요합니다.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

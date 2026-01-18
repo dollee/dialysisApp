@@ -15,7 +15,7 @@ class ManualDialysisScreen extends StatefulWidget {
 
 class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
   DateTime _dateTime = DateTime.now();
-  final List<_DialysisInputRow> _rows = [_DialysisInputRow()];
+  final _DialysisInputRow _row = _DialysisInputRow();
   bool _saving = false;
   int _baseSession = 0;
   bool _loadingSessions = true;
@@ -63,9 +63,7 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
 
   @override
   void dispose() {
-    for (final row in _rows) {
-      row.dispose();
-    }
+    _row.dispose();
     super.dispose();
   }
 
@@ -109,44 +107,31 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
     }
   }
 
-  void _addRow() {
-    setState(() {
-      _rows.add(_DialysisInputRow());
-    });
-  }
-
-  void _removeRow() {
-    if (_rows.length <= 1) return;
-    setState(() {
-      _rows.removeLast().dispose();
-    });
-  }
-
   Future<void> _save() async {
     setState(() => _saving = true);
     final dateText = DateFormat('yyyy-MM-dd').format(_dateTime);
     final timeText = DateFormat('HH:mm').format(_dateTime);
-    final rows = <DialysisRow>[];
-    for (var i = 0; i < _rows.length; i++) {
-      final inflow = double.tryParse(_rows[i].inflowController.text) ?? 0;
-      final outflow = double.tryParse(_rows[i].outflowController.text) ?? 0;
-      rows.add(
-        DialysisRow(
-          date: dateText,
-          time: timeText,
-          session: _baseSession + i + 1,
-          inflow: inflow,
-          outflow: outflow,
-        ),
-      );
-    }
+    final inflow = double.tryParse(_row.inflowController.text) ?? 0;
+    final outflow = double.tryParse(_row.outflowController.text) ?? 0;
+    final rows = [
+      DialysisRow(
+        date: dateText,
+        time: timeText,
+        session: _baseSession + 1,
+        inflow: inflow,
+        outflow: outflow,
+      ),
+    ];
 
     try {
       await context.read<AppState>().sheetsService.appendManualDialysis(rows);
       if (mounted) {
+        context.read<AppState>().addLog('손투석 입력 저장: ${rows.length}건');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('저장되었습니다.')),
         );
+        await context.read<AppState>().applyManualConsumption(_bagValue);
+        await context.read<AppState>().maybeRequestDelivery(context);
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } finally {
@@ -167,36 +152,41 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('배액백 선택'),
+            const Text('구분'),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
               children: [
-                _BagRadio(
-                  label: '배액백',
-                  value: '배액백',
-                  groupValue: _bagValue,
-                  onChanged: _setBagValue,
+                Expanded(
+                  child: _BagRadio(
+                    label: '배액백',
+                    value: '배액백',
+                    groupValue: _bagValue,
+                    onChanged: _setBagValue,
+                  ),
                 ),
-                _BagRadio(
-                  label: '1.5',
-                  value: '1.5',
-                  groupValue: _bagValue,
-                  onChanged: _setBagValue,
+                Expanded(
+                  child: _BagRadio(
+                    label: '1.5',
+                    value: '1.5',
+                    groupValue: _bagValue,
+                    onChanged: _setBagValue,
+                  ),
                 ),
-                _BagRadio(
-                  label: '2.3',
-                  value: '2.3',
-                  groupValue: _bagValue,
-                  onChanged: _setBagValue,
+                Expanded(
+                  child: _BagRadio(
+                    label: '2.3',
+                    value: '2.3',
+                    groupValue: _bagValue,
+                    onChanged: _setBagValue,
+                  ),
                 ),
-                _BagRadio(
-                  label: '4.3',
-                  value: '4.3',
-                  groupValue: _bagValue,
-                  onChanged: _setBagValue,
+                Expanded(
+                  child: _BagRadio(
+                    label: '4.3',
+                    value: '4.3',
+                    groupValue: _bagValue,
+                    onChanged: _setBagValue,
+                  ),
                 ),
               ],
             ),
@@ -219,33 +209,12 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
             if (_loadingSessions)
               const LinearProgressIndicator()
             else
-              Text('회차 시작: ${_baseSession + 1}'),
+              Text('회차: ${_baseSession + 1}'),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                ElevatedButton(
-                  onPressed: _addRow,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  child: const Text('+ 추가'),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _removeRow,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                  ),
-                  child: const Text('- 삭제'),
-                ),
-              ],
+            _DialysisRowCard(
+              index: _baseSession + 1,
+              row: _row,
             ),
-            const SizedBox(height: 12),
-            for (var i = 0; i < _rows.length; i++)
-              _DialysisRowCard(
-                index: _baseSession + i + 1,
-                row: _rows[i],
-              ),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _saving ? null : _save,
@@ -340,7 +309,7 @@ class _BagRadio extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       onTap: () => onChanged(value),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
           color: value == groupValue ? Colors.blue.shade50 : Colors.transparent,
           border: Border.all(
@@ -349,7 +318,7 @@ class _BagRadio extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Radio<String>(
               value: value,

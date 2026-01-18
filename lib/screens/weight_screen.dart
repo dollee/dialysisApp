@@ -71,6 +71,7 @@ class _WeightScreenState extends State<WeightScreen> {
         }
       }
       if (mounted) {
+        context.read<AppState>().addLog('체중 입력 저장: $weight kg');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('저장되었습니다.')),
         );

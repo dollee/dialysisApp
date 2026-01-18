@@ -86,6 +86,9 @@ class _BloodPressureScreenState extends State<BloodPressureScreen> {
         }
       }
       if (mounted) {
+        context
+            .read<AppState>()
+            .addLog('혈압 입력 저장: $systolic/$diastolic mmHg');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('저장되었습니다.')),
         );

@@ -45,6 +45,53 @@ class GoogleSheetsService {
     }
   }
 
+  Future<void> ensureInventorySheet() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final existingId = _prefs?.getString('inventorySheetId');
+    if (existingId != null && existingId.isNotEmpty) {
+      return;
+    }
+    final folderId = await _ensureAppFolder();
+    final sheetsApi = await _sheetsApi();
+    final spreadsheet = Spreadsheet(
+      properties: SpreadsheetProperties(
+        title: '투석물품 재고관리',
+      ),
+      sheets: [
+        Sheet(properties: SheetProperties(title: 'owned')),
+        Sheet(properties: SheetProperties(title: 'pending')),
+        Sheet(properties: SheetProperties(title: 'defective')),
+      ],
+    );
+    final created = await sheetsApi.spreadsheets.create(spreadsheet);
+    final sheetId = created.spreadsheetId ?? '';
+    await _prefs?.setString('inventorySheetId', sheetId);
+    if (sheetId.isNotEmpty && folderId.isNotEmpty) {
+      await _moveFileToFolder(sheetId, folderId);
+    }
+    await _appendRowsById(
+      sheetId,
+      'owned',
+      [
+        _inventoryHeaderRow(),
+      ],
+    );
+    await _appendRowsById(
+      sheetId,
+      'pending',
+      [
+        _inventoryHeaderRow(),
+      ],
+    );
+    await _appendRowsById(
+      sheetId,
+      'defective',
+      [
+        _inventoryHeaderRow(),
+      ],
+    );
+  }
+
   Future<String> _currentSheetId() async {
     final monthKey = _currentMonthKey();
     final sheetId = _prefs?.getString(_sheetIdKey(monthKey));
@@ -70,6 +117,7 @@ class GoogleSheetsService {
   }
 
   Future<void> shareAppFolder(String email) async {
+    await ensureInventorySheet();
     final folderId = await _ensureAppFolder();
     if (folderId.isEmpty) {
       return;
@@ -81,6 +129,46 @@ class GoogleSheetsService {
       emailAddress: email,
     );
     await driveApi.permissions.create(permission, folderId, sendNotificationEmail: false);
+  }
+
+  Future<InventorySnapshot> fetchLatestInventory(String section) async {
+    await ensureInventorySheet();
+    final sheetId = _prefs?.getString('inventorySheetId') ?? '';
+    if (sheetId.isEmpty) {
+      return InventorySnapshot.empty();
+    }
+    final values = await _getValuesById(sheetId, '$section!A2:J');
+    if (values == null || values.isEmpty) {
+      return InventorySnapshot.empty();
+    }
+    final last = values.last;
+    final numbers = <int>[];
+    for (var i = 1; i < 9; i++) {
+      if (last.length > i) {
+        numbers.add(int.tryParse('${last[i]}') ?? 0);
+      } else {
+        numbers.add(0);
+      }
+    }
+    return InventorySnapshot(values: numbers);
+  }
+
+  Future<void> appendInventory(
+    String section,
+    List<int> values, {
+    required bool autoRequest,
+  }) async {
+    await ensureInventorySheet();
+    final sheetId = _prefs?.getString('inventorySheetId') ?? '';
+    if (sheetId.isEmpty) {
+      return;
+    }
+    final row = [
+      DateFormat('yyyy-MM-dd HH:mm').format(DateTime.now()),
+      ...values,
+      autoRequest ? 'ON' : 'OFF',
+    ];
+    await _appendRowsById(sheetId, section, [row]);
   }
 
   Future<void> appendMachineDialysis(List<DialysisRow> rows) async {
@@ -188,9 +276,35 @@ class GoogleSheetsService {
     );
   }
 
+  Future<void> _appendRowsById(
+    String sheetId,
+    String sheetName,
+    List<List<Object?>> rows,
+  ) async {
+    if (rows.isEmpty) return;
+    final sheetsApi = await _sheetsApi();
+    final valueRange = ValueRange(values: rows);
+    await sheetsApi.spreadsheets.values.append(
+      valueRange,
+      sheetId,
+      '$sheetName!A:J',
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+    );
+  }
+
   Future<List<List<Object?>>?> _getValues(String range) async {
     final sheetsApi = await _sheetsApi();
     final sheetId = await _currentSheetId();
+    final response = await sheetsApi.spreadsheets.values.get(sheetId, range);
+    return response.values;
+  }
+
+  Future<List<List<Object?>>?> _getValuesById(
+    String sheetId,
+    String range,
+  ) async {
+    final sheetsApi = await _sheetsApi();
     final response = await sheetsApi.spreadsheets.values.get(sheetId, range);
     return response.values;
   }
@@ -261,6 +375,21 @@ class GoogleSheetsService {
   }
 
   String _sheetIdKey(String monthKey) => 'sheetId_$monthKey';
+
+  List<Object?> _inventoryHeaderRow() {
+    return [
+      'timestamp',
+      '1.5 2리터',
+      '2.3 2리터',
+      '4.3 2리터',
+      '1.5 3리터',
+      '2.3 3리터',
+      '4.3 f리터',
+      '겟트',
+      '배액백',
+      'auto_request',
+    ];
+  }
 }
 
 class DialysisRow {
@@ -331,4 +460,13 @@ class MonthlyData {
     }
     return map;
   }
+}
+
+class InventorySnapshot {
+  InventorySnapshot({required this.values});
+
+  final List<int> values;
+
+  factory InventorySnapshot.empty() =>
+      InventorySnapshot(values: List.filled(8, 0));
 }
