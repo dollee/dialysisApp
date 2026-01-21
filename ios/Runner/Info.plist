@@ -27,7 +27,9 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>GIDClientID</key>
-	<string>265119070036-aq9u7td7r09ko4n3ngrt1ri50gvvgm9l.apps.googleusercontent.com</string>
+	<string>577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1.apps.googleusercontent.com</string>
+	<key>GIDReversedClientID</key>
+	<string>com.googleusercontent.apps.577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -35,7 +37,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.265119070036-aq9u7td7r09ko4n3ngrt1ri50gvvgm9l</string>
+				<string>com.googleusercontent.apps.577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1</string>
 			</array>
 		</dict>
 	</array>

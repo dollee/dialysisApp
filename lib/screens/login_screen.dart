@@ -21,9 +21,14 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     try {
       await context.read<AppState>().signIn();
+      if (mounted && !context.read<AppState>().isSignedIn) {
+        setState(() {
+          _error = '로그인에 실패했습니다. 권한 요청을 확인해주세요.';
+        });
+      }
     } catch (error) {
       setState(() {
-        _error = '로그인에 실패했습니다.';
+        _error = '로그인에 실패했습니다. 로그인 화면이 멈추면 취소 후 다시 시도해주세요.';
       });
     } finally {
       if (mounted) {
@@ -64,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 _error!,
                 style: const TextStyle(color: Colors.red),
+                textAlign: TextAlign.center,
               ),
             ],
           ],

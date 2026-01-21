@@ -21,11 +21,18 @@ class GoogleSheetsService {
     final monthKey = _currentMonthKey();
     final existingId = _prefs?.getString(_sheetIdKey(monthKey));
     if (existingId != null && existingId.isNotEmpty) {
-      return;
+      final trashedOrMissing = await _isFileTrashedOrMissing(existingId);
+      if (!trashedOrMissing) {
+        return;
+      }
+      await _prefs?.remove(_sheetIdKey(monthKey));
     }
 
     final folderId = await _ensureAppFolder();
-    final sheetsApi = await _sheetsApi();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: false);
+    if (sheetsApi == null) {
+      return;
+    }
     final spreadsheet = Spreadsheet(
       properties: SpreadsheetProperties(
         title: 'Dialysis $monthKey',
@@ -45,14 +52,30 @@ class GoogleSheetsService {
     }
   }
 
-  Future<void> ensureInventorySheet() async {
+  Future<String> ensureInventorySheet() async {
     _prefs ??= await SharedPreferences.getInstance();
     final existingId = _prefs?.getString('inventorySheetId');
     if (existingId != null && existingId.isNotEmpty) {
-      return;
+      final trashedOrMissing = await _isFileTrashedOrMissing(existingId);
+      if (trashedOrMissing) {
+        await _prefs?.remove('inventorySheetId');
+      } else {
+        final folderId = await _ensureAppFolder();
+        await _ensureSheetTabsExist(
+          existingId,
+          ['owned', 'pending', 'defective'],
+        );
+        if (folderId.isNotEmpty) {
+          await _moveFileToFolder(existingId, folderId);
+        }
+        return existingId;
+      }
     }
     final folderId = await _ensureAppFolder();
-    final sheetsApi = await _sheetsApi();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      return '';
+    }
     final spreadsheet = Spreadsheet(
       properties: SpreadsheetProperties(
         title: '투석물품 재고관리',
@@ -90,6 +113,74 @@ class GoogleSheetsService {
         _inventoryHeaderRow(),
       ],
     );
+    return sheetId;
+  }
+
+  Future<InventoryStorageInfo> getInventoryStorageInfo() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final sheetId = _prefs?.getString('inventorySheetId') ?? '';
+    final folderId = _prefs?.getString('driveFolderId') ?? '';
+    if (sheetId.isEmpty) {
+      return InventoryStorageInfo(
+        sheetId: '',
+        fileName: '',
+        folderId: folderId,
+        parentIds: '',
+        webViewLink: '',
+        trashed: false,
+        errorMessage: 'sheetId 없음',
+      );
+    }
+    try {
+      final driveApi = await _driveApi(promptIfNecessary: false);
+      if (driveApi == null) {
+        return InventoryStorageInfo(
+          sheetId: sheetId,
+          fileName: '',
+          folderId: folderId,
+          parentIds: '',
+          webViewLink: '',
+          trashed: false,
+          errorMessage: 'auth_required',
+        );
+      }
+      final file = await driveApi.files.get(
+        sheetId,
+        $fields: 'id, name, parents, webViewLink, trashed',
+      ) as drive.File;
+      return InventoryStorageInfo(
+        sheetId: sheetId,
+        fileName: file.name ?? '',
+        folderId: folderId,
+        parentIds: (file.parents ?? []).join(','),
+        webViewLink: file.webViewLink ?? '',
+        trashed: file.trashed ?? false,
+        errorMessage: '',
+      );
+    } catch (error) {
+      return InventoryStorageInfo(
+        sheetId: sheetId,
+        fileName: '',
+        folderId: folderId,
+        parentIds: '',
+        webViewLink: '',
+        trashed: false,
+        errorMessage: error.toString(),
+      );
+    }
+  }
+
+  Future<String> getDriveUserEmail() async {
+    try {
+      final driveApi = await _driveApi(promptIfNecessary: false);
+      if (driveApi == null) {
+        return '';
+      }
+      final about = await driveApi.about.get($fields: 'user(emailAddress)');
+      return about.user?.emailAddress ?? '';
+    } catch (_) {
+      return '';
+    }
   }
 
   Future<String> _currentSheetId() async {
@@ -107,13 +198,17 @@ class GoogleSheetsService {
     if (sheetId.isEmpty) {
       return;
     }
-    final driveApi = await _driveApi();
+    final driveApi = await _driveApi(promptIfNecessary: true);
+    if (driveApi == null) {
+      return;
+    }
     final permission = drive.Permission(
       type: 'user',
       role: 'writer',
       emailAddress: email,
     );
-    await driveApi.permissions.create(permission, sheetId, sendNotificationEmail: false);
+    await driveApi.permissions
+        .create(permission, sheetId, sendNotificationEmail: false);
   }
 
   Future<void> shareAppFolder(String email) async {
@@ -122,13 +217,17 @@ class GoogleSheetsService {
     if (folderId.isEmpty) {
       return;
     }
-    final driveApi = await _driveApi();
+    final driveApi = await _driveApi(promptIfNecessary: true);
+    if (driveApi == null) {
+      return;
+    }
     final permission = drive.Permission(
       type: 'user',
       role: 'writer',
       emailAddress: email,
     );
-    await driveApi.permissions.create(permission, folderId, sendNotificationEmail: false);
+    await driveApi.permissions
+        .create(permission, folderId, sendNotificationEmail: false);
   }
 
   Future<InventorySnapshot> fetchLatestInventory(String section) async {
@@ -220,8 +319,7 @@ class GoogleSheetsService {
     return values.map((row) {
       final date = row.length > 0 ? '${row[0]}' : '';
       final time = row.length > 1 ? '${row[1]}' : '';
-      final value =
-          row.length > 2 ? double.tryParse('${row[2]}') ?? 0.0 : 0.0;
+      final value = row.length > 2 ? double.tryParse('${row[2]}') ?? 0.0 : 0.0;
       return WeightEntry(date: date, time: time, weight: value);
     }).toList();
   }
@@ -248,10 +346,8 @@ class GoogleSheetsService {
       final date = row.length > 0 ? '${row[0]}' : '';
       final time = row.length > 1 ? '${row[1]}' : '';
       final session = row.length > 2 ? int.tryParse('${row[2]}') ?? 0 : 0;
-      final inflow =
-          row.length > 3 ? double.tryParse('${row[3]}') ?? 0.0 : 0.0;
-      final outflow =
-          row.length > 4 ? double.tryParse('${row[4]}') ?? 0.0 : 0.0;
+      final inflow = row.length > 3 ? double.tryParse('${row[3]}') ?? 0.0 : 0.0;
+      final outflow = row.length > 4 ? double.tryParse('${row[4]}') ?? 0.0 : 0.0;
       return DialysisRow(
         date: date,
         time: time,
@@ -264,7 +360,10 @@ class GoogleSheetsService {
 
   Future<void> _appendRows(String sheetName, List<List<Object?>> rows) async {
     if (rows.isEmpty) return;
-    final sheetsApi = await _sheetsApi();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      return;
+    }
     final sheetId = await _currentSheetId();
     final valueRange = ValueRange(values: rows);
     await sheetsApi.spreadsheets.values.append(
@@ -282,7 +381,10 @@ class GoogleSheetsService {
     List<List<Object?>> rows,
   ) async {
     if (rows.isEmpty) return;
-    final sheetsApi = await _sheetsApi();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      return;
+    }
     final valueRange = ValueRange(values: rows);
     await sheetsApi.spreadsheets.values.append(
       valueRange,
@@ -294,7 +396,10 @@ class GoogleSheetsService {
   }
 
   Future<List<List<Object?>>?> _getValues(String range) async {
-    final sheetsApi = await _sheetsApi();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      return null;
+    }
     final sheetId = await _currentSheetId();
     final response = await sheetsApi.spreadsheets.values.get(sheetId, range);
     return response.values;
@@ -304,30 +409,92 @@ class GoogleSheetsService {
     String sheetId,
     String range,
   ) async {
-    final sheetsApi = await _sheetsApi();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      return null;
+    }
     final response = await sheetsApi.spreadsheets.values.get(sheetId, range);
     return response.values;
   }
 
-  Future<SheetsApi> _sheetsApi() async {
-    final headers = await _authService?.authHeaders() ?? {};
-    final client = GoogleAuthClient(headers);
-    return SheetsApi(client);
+  Future<void> _ensureSheetTabsExist(
+    String sheetId,
+    List<String> titles,
+  ) async {
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      return;
+    }
+    final spreadsheet = await sheetsApi.spreadsheets.get(
+      sheetId,
+      includeGridData: false,
+    );
+    final existing = spreadsheet.sheets
+            ?.map((sheet) => sheet.properties?.title)
+            .whereType<String>()
+            .toSet() ??
+        {};
+    final requests = <Request>[];
+    for (final title in titles) {
+      if (!existing.contains(title)) {
+        requests.add(
+          Request(
+            addSheet: AddSheetRequest(
+              properties: SheetProperties(title: title),
+            ),
+          ),
+        );
+      }
+    }
+    if (requests.isEmpty) return;
+    await sheetsApi.spreadsheets.batchUpdate(
+      BatchUpdateSpreadsheetRequest(requests: requests),
+      sheetId,
+    );
   }
 
-  Future<drive.DriveApi> _driveApi() async {
-    final headers = await _authService?.authHeaders() ?? {};
-    final client = GoogleAuthClient(headers);
-    return drive.DriveApi(client);
+  Future<SheetsApi?> _sheetsApi({required bool promptIfNecessary}) async {
+    try {
+      final client = await _authService?.getAuthenticatedClient(
+        promptIfNecessary: promptIfNecessary,
+      );
+      if (client == null) {
+        return null;
+      }
+      return SheetsApi(client);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<drive.DriveApi?> _driveApi({required bool promptIfNecessary}) async {
+    try {
+      final client = await _authService?.getAuthenticatedClient(
+        promptIfNecessary: promptIfNecessary,
+      );
+      if (client == null) {
+        return null;
+      }
+      return drive.DriveApi(client);
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<String> _ensureAppFolder() async {
     _prefs ??= await SharedPreferences.getInstance();
     final cached = _prefs?.getString('driveFolderId');
     if (cached != null && cached.isNotEmpty) {
-      return cached;
+      final trashedOrMissing = await _isFileTrashedOrMissing(cached);
+      if (!trashedOrMissing) {
+        return cached;
+      }
+      await _prefs?.remove('driveFolderId');
     }
-    final driveApi = await _driveApi();
+    final driveApi = await _driveApi(promptIfNecessary: true);
+    if (driveApi == null) {
+      return '';
+    }
     final response = await driveApi.files.list(
       q: "mimeType='application/vnd.google-apps.folder' "
           "and name='투석결과App' and trashed=false",
@@ -355,7 +522,10 @@ class GoogleSheetsService {
   }
 
   Future<void> _moveFileToFolder(String fileId, String folderId) async {
-    final driveApi = await _driveApi();
+    final driveApi = await _driveApi(promptIfNecessary: true);
+    if (driveApi == null) {
+      return;
+    }
     final file = await driveApi.files.get(
       fileId,
       $fields: 'parents',
@@ -368,6 +538,22 @@ class GoogleSheetsService {
       removeParents: previousParents.isEmpty ? null : previousParents,
       $fields: 'id, parents',
     );
+  }
+
+  Future<bool> _isFileTrashedOrMissing(String fileId) async {
+    try {
+      final driveApi = await _driveApi(promptIfNecessary: false);
+      if (driveApi == null) {
+        return true;
+      }
+      final file = await driveApi.files.get(
+        fileId,
+        $fields: 'trashed',
+      ) as drive.File;
+      return file.trashed == true;
+    } catch (_) {
+      return true;
+    }
   }
 
   String _currentMonthKey() {
@@ -469,4 +655,24 @@ class InventorySnapshot {
 
   factory InventorySnapshot.empty() =>
       InventorySnapshot(values: List.filled(8, 0));
+}
+
+class InventoryStorageInfo {
+  InventoryStorageInfo({
+    required this.sheetId,
+    required this.fileName,
+    required this.folderId,
+    required this.parentIds,
+    required this.webViewLink,
+    required this.trashed,
+    required this.errorMessage,
+  });
+
+  final String sheetId;
+  final String fileName;
+  final String folderId;
+  final String parentIds;
+  final String webViewLink;
+  final bool trashed;
+  final String errorMessage;
 }

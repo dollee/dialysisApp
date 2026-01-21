@@ -102,6 +102,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('저장되었습니다.')),
       );
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
     }
   }
 }
@@ -203,8 +206,8 @@ class _InventoryGroup extends StatelessWidget {
     '4.3 2리터',
     '1.5 3리터',
     '2.3 3리터',
-    '4.3 f리터',
-    '겟트',
+    '4.3 3리터',
+    '셋트',
     '배액백',
   ];
 

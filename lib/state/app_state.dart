@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/google_auth_service.dart';
 import '../services/google_sheets_service.dart';
 import '../services/health_service.dart';
+import '../widgets/contact_picker.dart';
 
 class AppState extends ChangeNotifier {
   AppState()
@@ -45,13 +45,47 @@ class AppState extends ChangeNotifier {
         _prefs?.getBool('writeBloodPressureToHealth') ?? false;
     _shareEmail = _prefs?.getString('shareEmail');
 
-    final signedInUser = await _authService.signInSilently();
-    _isSignedIn = signedInUser != null;
+    final signedInEmail = await _authService.signInSilently();
+    _isSignedIn = signedInEmail != null;
     if (_isSignedIn) {
       await _sheetsService.bindAuth(_authService);
-      await _sheetsService.ensureCurrentMonthSheet();
+      if (signedInEmail != null && signedInEmail.isNotEmpty) {
+        addLog('구글 계정: $signedInEmail');
+      }
+      if (await _authService.hasDriveAccess()) {
+        await _sheetsService.ensureCurrentMonthSheet();
+        try {
+          final sheetId = await _sheetsService.ensureInventorySheet();
+          final driveEmail = await _sheetsService.getDriveUserEmail();
+          if (driveEmail.isNotEmpty) {
+            addLog('드라이브 API 계정: $driveEmail');
+          }
+          if (sheetId.isNotEmpty) {
+            addLog('재고 시트 확인: $sheetId');
+          }
+          final info = await _sheetsService.getInventoryStorageInfo();
+          addLog(
+            '재고 저장 위치: '
+            'file=${info.fileName.isEmpty ? 'unknown' : info.fileName} '
+            'sheetId=${info.sheetId.isEmpty ? 'none' : info.sheetId} '
+            'folderId=${info.folderId.isEmpty ? 'none' : info.folderId} '
+            'parents=${info.parentIds.isEmpty ? 'none' : info.parentIds} '
+            'link=${info.webViewLink.isEmpty ? 'none' : info.webViewLink} '
+            'trashed=${info.trashed} '
+            'error=${info.errorMessage.isEmpty ? 'none' : info.errorMessage}',
+          );
+        } catch (error) {
+          addLog('재고 시트 생성 실패: $error');
+        }
+      } else {
+        addLog('드라이브 권한 없음: 동기화 대기');
+      }
       if (_shareEmail != null && _shareEmail!.isNotEmpty) {
-        await _sheetsService.shareAppFolder(_shareEmail!);
+        if (await _authService.hasDriveAccess()) {
+          await _sheetsService.shareAppFolder(_shareEmail!);
+        } else {
+          addLog('공유 요청 보류: 드라이브 권한 필요');
+        }
       }
     }
 
@@ -60,18 +94,60 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signIn() async {
-    final user = await _authService.signIn();
-    _isSignedIn = user != null;
-    if (_isSignedIn) {
-      await _secureStorage.write(
-        key: 'googleUserEmail',
-        value: user?.email ?? '',
-      );
-      await _sheetsService.bindAuth(_authService);
-      await _sheetsService.ensureCurrentMonthSheet();
-      if (_shareEmail != null && _shareEmail!.isNotEmpty) {
-        await _sheetsService.shareAppFolder(_shareEmail!);
+    try {
+      addLog('로그인 시작...');
+      final signedInEmail = await _authService.signIn();
+      if (signedInEmail == null) {
+        addLog('구글 로그인 실패 또는 취소됨');
+      } else {
+        addLog('로그인 성공: $signedInEmail');
       }
+      _isSignedIn = signedInEmail != null;
+      if (_isSignedIn) {
+        await _secureStorage.write(
+          key: 'googleUserEmail',
+          value: signedInEmail ?? '',
+        );
+        await _sheetsService.bindAuth(_authService);
+        if (signedInEmail != null && signedInEmail.isNotEmpty) {
+          addLog('구글 계정: $signedInEmail');
+        }
+        if (await _authService.hasDriveAccess()) {
+          await _sheetsService.ensureCurrentMonthSheet();
+          try {
+            final sheetId = await _sheetsService.ensureInventorySheet();
+            final driveEmail = await _sheetsService.getDriveUserEmail();
+            if (driveEmail.isNotEmpty) {
+              addLog('드라이브 API 계정: $driveEmail');
+            }
+            final info = await _sheetsService.getInventoryStorageInfo();
+            addLog(
+              '재고 저장 위치: '
+              'file=${info.fileName.isEmpty ? 'unknown' : info.fileName} '
+              'sheetId=${info.sheetId.isEmpty ? 'none' : info.sheetId} '
+              'folderId=${info.folderId.isEmpty ? 'none' : info.folderId} '
+              'parents=${info.parentIds.isEmpty ? 'none' : info.parentIds} '
+              'link=${info.webViewLink.isEmpty ? 'none' : info.webViewLink} '
+              'trashed=${info.trashed} '
+              'error=${info.errorMessage.isEmpty ? 'none' : info.errorMessage}',
+            );
+          } catch (error) {
+            addLog('재고 시트 생성 실패: $error');
+          }
+        } else {
+          addLog('드라이브 권한 없음: 동기화 대기');
+        }
+        if (_shareEmail != null && _shareEmail!.isNotEmpty) {
+          if (await _authService.hasDriveAccess()) {
+            await _sheetsService.shareAppFolder(_shareEmail!);
+          } else {
+            addLog('공유 요청 보류: 드라이브 권한 필요');
+          }
+        }
+      }
+    } catch (error) {
+      addLog('로그인 중 에러: $error');
+      rethrow;
     }
     notifyListeners();
   }
@@ -290,7 +366,6 @@ class AppState extends ChangeNotifier {
   }
 
   bool _isHoliday(DateTime date) {
-    // 고정 공휴일(양력) 기준. 필요 시 추가 공휴일을 아래에 더 넣을 수 있음.
     final fixed = <String>{
       '${date.year}-01-01', // 신정
       '${date.year}-03-01', // 삼일절
@@ -324,11 +399,9 @@ class AppState extends ChangeNotifier {
           actions: [
             TextButton(
               onPressed: () async {
-                final allowed = await FlutterContacts.requestPermission();
-                if (!allowed) return;
-                final contact = await FlutterContacts.openExternalPick();
-                if (contact == null || contact.phones.isEmpty) return;
-                controller.text = contact.phones.first.number;
+                final phone = await pickContactPhone(dialogContext);
+                if (phone == null || phone.trim().isEmpty) return;
+                controller.text = phone;
               },
               child: const Text('주소록'),
             ),

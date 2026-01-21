@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../widgets/contact_picker.dart';
 import 'debug_log_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -90,11 +90,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickContact() async {
-    final allowed = await FlutterContacts.requestPermission();
-    if (!allowed) return;
-    final contact = await FlutterContacts.openExternalPick();
-    if (contact == null || contact.phones.isEmpty) return;
-    _phoneController.text = contact.phones.first.number;
+    final phone = await pickContactPhone(context);
+    if (phone == null || phone.trim().isEmpty) return;
+    _phoneController.text = phone;
     await _saveTextValues();
     if (mounted) {
       setState(() {});
