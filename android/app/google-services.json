@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:265119070036:android:0ca972f7ce2ad03f063ac1",
         "android_client_info": {
-          "package_name": "com.dollee.dialysisApp"
+          "package_name": "com.example.dialysis_app"
         }
       },
       "oauth_client": [],

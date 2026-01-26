@@ -1,4 +1,4 @@
-package com.dollee.dialysisApp
+package com.example.dialysis_app
 
 import io.flutter.embedding.android.FlutterActivity
 

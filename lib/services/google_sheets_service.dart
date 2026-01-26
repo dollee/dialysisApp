@@ -317,7 +317,7 @@ class GoogleSheetsService {
   List<WeightEntry> _mapWeight(List<List<Object?>>? values) {
     if (values == null) return [];
     return values.map((row) {
-      final date = row.length > 0 ? '${row[0]}' : '';
+      final date = row.isNotEmpty ? '${row[0]}' : '';
       final time = row.length > 1 ? '${row[1]}' : '';
       final value = row.length > 2 ? double.tryParse('${row[2]}') ?? 0.0 : 0.0;
       return WeightEntry(date: date, time: time, weight: value);
@@ -327,7 +327,7 @@ class GoogleSheetsService {
   List<BloodPressureEntry> _mapPressure(List<List<Object?>>? values) {
     if (values == null) return [];
     return values.map((row) {
-      final date = row.length > 0 ? '${row[0]}' : '';
+      final date = row.isNotEmpty ? '${row[0]}' : '';
       final time = row.length > 1 ? '${row[1]}' : '';
       final systolic = row.length > 2 ? int.tryParse('${row[2]}') ?? 0 : 0;
       final diastolic = row.length > 3 ? int.tryParse('${row[3]}') ?? 0 : 0;
@@ -343,7 +343,7 @@ class GoogleSheetsService {
   List<DialysisRow> _mapDialysis(List<List<Object?>>? values) {
     if (values == null) return [];
     return values.map((row) {
-      final date = row.length > 0 ? '${row[0]}' : '';
+      final date = row.isNotEmpty ? '${row[0]}' : '';
       final time = row.length > 1 ? '${row[1]}' : '';
       final session = row.length > 2 ? int.tryParse('${row[2]}') ?? 0 : 0;
       final inflow = row.length > 3 ? double.tryParse('${row[3]}') ?? 0.0 : 0.0;

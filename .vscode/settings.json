@@ -1,3 +1,7 @@
 {
-    "geminicodeassist.project": "\t dialysisapp-484513"
+    "geminicodeassist.project": "dialysisapp-AIzaSyAOjxh4fs_vk3eDw0jwwt8tmUhoidR7mRw",
+    "geminicodeassist.agent.additionalTrustedCertificates": "AIzaSyAOjxh4fs_vk3eDw0jwwt8tmUhoidR7mRw",
+    "geminicodeassist.agentDebugMode": true,
+    "geminicodeassist.agentYoloMode": true,
+    "geminicodeassist.codeGenerationPaneViewEnabled": true
 }
