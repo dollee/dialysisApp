@@ -5,7 +5,6 @@ import 'package:googleapis/sheets/v4.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'google_api_client.dart';
 import 'google_auth_service.dart';
 
 class GoogleSheetsService {
@@ -17,14 +16,32 @@ class GoogleSheetsService {
     _prefs ??= await SharedPreferences.getInstance();
   }
 
+  /// 재고 시트 내부 탭 이름 (재고 시트에는 더 이상 설정 탭 없음)
+  static const _settingsSheetName = 'settings';
+
+  /// 설정 전용 스프레드시트 파일 제목 (Drive에 "투석 설정" 파일로 저장)
+  static const _settingsFileTitle = '투석 설정';
+  static const _settingsFilePrefKey = 'settingsSheetId';
+
   Future<void> ensureCurrentMonthSheet() async {
     final monthKey = _currentMonthKey();
     final existingId = _prefs?.getString(_sheetIdKey(monthKey));
+    // 이미 저장된 월별 시트 ID가 있을 때, 위치와 상태를 검증한다.
     if (existingId != null && existingId.isNotEmpty) {
+      // 1) 파일이 휴지통이거나 존재하지 않으면 무시하고 새로 생성
       final trashedOrMissing = await _isFileTrashedOrMissing(existingId);
-      if (!trashedOrMissing) {
+      final appFolderId = await _ensureAppFolder();
+      final inAppFolder = await _isFileInFolder(
+        existingId,
+        appFolderId,
+      ); // '투석결과App' 여부
+
+      if (!trashedOrMissing && inAppFolder) {
+        // 정상적인 위치(투석결과App 폴더)에 있고, 삭제되지 않은 경우 그대로 사용
         return;
       }
+
+      // 여기까지 왔다면: 삭제되었거나, 다른 폴더에 있거나, 정보 조회 실패 → 새로 생성
       await _prefs?.remove(_sheetIdKey(monthKey));
     }
 
@@ -34,9 +51,7 @@ class GoogleSheetsService {
       return;
     }
     final spreadsheet = Spreadsheet(
-      properties: SpreadsheetProperties(
-        title: 'Dialysis $monthKey',
-      ),
+      properties: SpreadsheetProperties(title: 'Dialysis $monthKey'),
       sheets: [
         Sheet(properties: SheetProperties(title: 'dialysis_machine')),
         Sheet(properties: SheetProperties(title: 'dialysis_manual')),
@@ -55,65 +70,229 @@ class GoogleSheetsService {
   Future<String> ensureInventorySheet() async {
     _prefs ??= await SharedPreferences.getInstance();
     final existingId = _prefs?.getString('inventorySheetId');
+    // 이미 저장된 시트 ID가 있을 때, 위치와 상태를 검증한다.
     if (existingId != null && existingId.isNotEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] ensureInventorySheet: existingId=$existingId 검증 시작');
+      // 1) 파일이 휴지통이거나 존재하지 않으면 무시하고 새로 생성
       final trashedOrMissing = await _isFileTrashedOrMissing(existingId);
-      if (trashedOrMissing) {
-        await _prefs?.remove('inventorySheetId');
-      } else {
-        final folderId = await _ensureAppFolder();
-        await _ensureSheetTabsExist(
-          existingId,
-          ['owned', 'pending', 'defective'],
+      final appFolderId = await _ensureAppFolder();
+      final inAppFolder = await _isFileInFolder(
+        existingId,
+        appFolderId,
+      ); // '투석결과App' 여부
+
+      if (!trashedOrMissing && inAppFolder) {
+        // 정상적인 위치(투석결과App 폴더)에 있고, 삭제되지 않은 경우 그대로 사용
+        // ignore: avoid_print
+        print(
+          '[Sheets] ensureInventorySheet: 기존 시트 유효 → 탭 확인 후 사용 existingId=$existingId',
         );
-        if (folderId.isNotEmpty) {
-          await _moveFileToFolder(existingId, folderId);
-        }
+        await _ensureSheetTabsExist(existingId, [
+          'owned',
+          'pending',
+          'defective',
+        ]);
         return existingId;
       }
+
+      // 여기까지 왔다면: 삭제되었거나, 다른 폴더에 있거나, 정보 조회 실패 → 새로 생성
+      await _prefs?.remove('inventorySheetId');
+      // ignore: avoid_print
+      print('[Sheets] ensureInventorySheet: 기존 ID 무효 → 재생성 준비');
     }
+    // ignore: avoid_print
+    print('[Sheets] ensureInventorySheet: 앱 폴더 확인 중...');
     final folderId = await _ensureAppFolder();
+    // ignore: avoid_print
+    print(
+      '[Sheets] ensureInventorySheet: folderId=${folderId.isEmpty ? "없음" : folderId}',
+    );
     final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
+      // ignore: avoid_print
+      print('[Sheets] ensureInventorySheet: sheetsApi=null → 종료');
       return '';
     }
     final spreadsheet = Spreadsheet(
-      properties: SpreadsheetProperties(
-        title: '투석물품 재고관리',
-      ),
+      properties: SpreadsheetProperties(title: '투석물품 재고관리'),
       sheets: [
         Sheet(properties: SheetProperties(title: 'owned')),
         Sheet(properties: SheetProperties(title: 'pending')),
         Sheet(properties: SheetProperties(title: 'defective')),
       ],
     );
+    // ignore: avoid_print
+    print('[Sheets] ensureInventorySheet: 새 스프레드시트 생성 요청');
     final created = await sheetsApi.spreadsheets.create(spreadsheet);
     final sheetId = created.spreadsheetId ?? '';
+    // ignore: avoid_print
+    print('[Sheets] ensureInventorySheet: created.sheetId=$sheetId');
     await _prefs?.setString('inventorySheetId', sheetId);
     if (sheetId.isNotEmpty && folderId.isNotEmpty) {
       await _moveFileToFolder(sheetId, folderId);
     }
-    await _appendRowsById(
-      sheetId,
-      'owned',
-      [
-        _inventoryHeaderRow(),
-      ],
-    );
-    await _appendRowsById(
-      sheetId,
-      'pending',
-      [
-        _inventoryHeaderRow(),
-      ],
-    );
-    await _appendRowsById(
-      sheetId,
-      'defective',
-      [
-        _inventoryHeaderRow(),
-      ],
-    );
+    await _appendRowsById(sheetId, 'owned', [_inventoryHeaderRow()]);
+    await _appendRowsById(sheetId, 'pending', [_inventoryHeaderRow()]);
+    await _appendRowsById(sheetId, 'defective', [_inventoryHeaderRow()]);
+    // ignore: avoid_print
+    print('[Sheets] ensureInventorySheet: 재고 시트/헤더까지 생성 완료');
     return sheetId;
+  }
+
+  /// 설정 전용 스프레드시트 파일(투석 설정)을 확인·생성한다.
+  /// - 저장 위치: 투석결과App 폴더 안 "투석 설정" 파일
+  Future<String> ensureSettingsSheet() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final existingId = _prefs?.getString(_settingsFilePrefKey);
+    if (existingId != null && existingId.isNotEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] ensureSettingsSheet: existingId=$existingId 검증 시작');
+      final trashedOrMissing = await _isFileTrashedOrMissing(existingId);
+      final appFolderId = await _ensureAppFolder();
+      final inAppFolder = await _isFileInFolder(existingId, appFolderId);
+      if (!trashedOrMissing && inAppFolder) {
+        // ignore: avoid_print
+        print('[Sheets] ensureSettingsSheet: 기존 설정 파일 유효 → 사용');
+        return existingId;
+      }
+      await _prefs?.remove(_settingsFilePrefKey);
+      // ignore: avoid_print
+      print('[Sheets] ensureSettingsSheet: 기존 ID 무효 → 재생성 준비');
+    }
+    final folderId = await _ensureAppFolder();
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      // ignore: avoid_print
+      print('[Sheets] ensureSettingsSheet: sheetsApi=null → 종료');
+      return '';
+    }
+    final spreadsheet = Spreadsheet(
+      properties: SpreadsheetProperties(title: _settingsFileTitle),
+      sheets: [Sheet(properties: SheetProperties(title: _settingsSheetName))],
+    );
+    // ignore: avoid_print
+    print('[Sheets] ensureSettingsSheet: 새 설정 파일 생성 요청');
+    final created = await sheetsApi.spreadsheets.create(spreadsheet);
+    final sheetId = created.spreadsheetId ?? '';
+    await _prefs?.setString(_settingsFilePrefKey, sheetId);
+    if (sheetId.isNotEmpty && folderId.isNotEmpty) {
+      await _moveFileToFolder(sheetId, folderId);
+    }
+    await _appendRowsById(sheetId, _settingsSheetName, [
+      ['key', 'value'],
+    ]);
+    // ignore: avoid_print
+    print('[Sheets] ensureSettingsSheet: 설정 파일 생성 완료 sheetId=$sheetId');
+    return sheetId;
+  }
+
+  /// Google Sheets 설정 파일(투석 설정)에서 설정값을 불러온다.
+  Future<Map<String, String>> loadSettingsFromSheet() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final sheetId =
+        _prefs?.getString(_settingsFilePrefKey) ?? await ensureSettingsSheet();
+    if (sheetId.isEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] loadSettingsFromSheet: sheetId 없음 → 빈 맵');
+      return {};
+    }
+
+    final sheetsApi = await _sheetsApi(promptIfNecessary: false);
+    if (sheetsApi == null) {
+      // ignore: avoid_print
+      print('[Sheets] loadSettingsFromSheet: sheetsApi null → 빈 맵');
+      return {};
+    }
+
+    try {
+      final resp = await sheetsApi.spreadsheets.values.get(
+        sheetId,
+        '$_settingsSheetName!A:B',
+      );
+      final values = resp.values;
+      if (values != null && values.length > 1) {
+        final Map<String, String> result = {};
+        for (var i = 1; i < values.length; i++) {
+          final row = values[i];
+          if (row.isEmpty || row.length < 2) continue;
+          final key = '${row[0]}'.trim();
+          final value = '${row[1]}'.trim();
+          if (key.isEmpty) continue;
+          result[key] = value;
+        }
+        // ignore: avoid_print
+        print(
+          '[Sheets] loadSettingsFromSheet: 성공(설정 파일) sheetId=$sheetId 키 ${result.length}개',
+        );
+        return result;
+      }
+
+      // ignore: avoid_print
+      print(
+        '[Sheets] loadSettingsFromSheet: 데이터 없음(행 ${values?.length ?? 0}) → 빈 맵',
+      );
+      return {};
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Sheets] loadSettingsFromSheet 예외: $e → 빈 맵');
+      return {};
+    }
+  }
+
+  /// 현재 설정값을 설정 전용 파일(투석 설정)에 저장한다.
+  Future<void> saveSettingsToSheet(Map<String, String> settings) async {
+    if (settings.isEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] saveSettingsToSheet: settings 비어 있음 → 스킵');
+      return;
+    }
+    _prefs ??= await SharedPreferences.getInstance();
+    final sheetId =
+        _prefs?.getString(_settingsFilePrefKey) ?? await ensureSettingsSheet();
+    if (sheetId.isEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] saveSettingsToSheet: sheetId 없음 → 스킵');
+      return;
+    }
+
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
+    if (sheetsApi == null) {
+      // ignore: avoid_print
+      print('[Sheets] saveSettingsToSheet: sheetsApi null → 스킵');
+      return;
+    }
+
+    try {
+      // ignore: avoid_print
+      print('[Sheets] saveSettingsToSheet: clear 시작 sheetId=$sheetId');
+      // NOTE: clear(request, spreadsheetId, range) 순서여야 한다.
+      await sheetsApi.spreadsheets.values.clear(
+        ClearValuesRequest(),
+        sheetId,
+        '$_settingsSheetName!A:Z',
+      );
+      // ignore: avoid_print
+      print(
+        '[Sheets] saveSettingsToSheet: clear 완료, append ${settings.length}개 행',
+      );
+
+      final rows = <List<Object>>[
+        ['key', 'value'],
+        for (final entry in settings.entries) [entry.key, entry.value],
+      ];
+
+      await _appendRowsById(sheetId, _settingsSheetName, rows);
+      // ignore: avoid_print
+      print('[Sheets] saveSettingsToSheet: 완료 sheetId=$sheetId');
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[Sheets] saveSettingsToSheet 예외: $e');
+      // ignore: avoid_print
+      print(
+        '[Sheets] saveSettingsToSheet 스택: ${st.toString().split('\n').take(2).join(' ')}',
+      );
+    }
   }
 
   Future<InventoryStorageInfo> getInventoryStorageInfo() async {
@@ -144,10 +323,12 @@ class GoogleSheetsService {
           errorMessage: 'auth_required',
         );
       }
-      final file = await driveApi.files.get(
-        sheetId,
-        $fields: 'id, name, parents, webViewLink, trashed',
-      ) as drive.File;
+      final file =
+          await driveApi.files.get(
+                sheetId,
+                $fields: 'id, name, parents, webViewLink, trashed',
+              )
+              as drive.File;
       return InventoryStorageInfo(
         sheetId: sheetId,
         fileName: file.name ?? '',
@@ -207,8 +388,11 @@ class GoogleSheetsService {
       role: 'writer',
       emailAddress: email,
     );
-    await driveApi.permissions
-        .create(permission, sheetId, sendNotificationEmail: false);
+    await driveApi.permissions.create(
+      permission,
+      sheetId,
+      sendNotificationEmail: false,
+    );
   }
 
   Future<void> shareAppFolder(String email) async {
@@ -226,8 +410,11 @@ class GoogleSheetsService {
       role: 'writer',
       emailAddress: email,
     );
-    await driveApi.permissions
-        .create(permission, folderId, sendNotificationEmail: false);
+    await driveApi.permissions.create(
+      permission,
+      folderId,
+      sendNotificationEmail: false,
+    );
   }
 
   Future<InventorySnapshot> fetchLatestInventory(String section) async {
@@ -298,7 +485,9 @@ class GoogleSheetsService {
       return 0;
     }
     final dateText = DateFormat('yyyy-MM-dd').format(date);
-    return values.where((row) => row.isNotEmpty && row.first == dateText).length;
+    return values
+        .where((row) => row.isNotEmpty && row.first == dateText)
+        .length;
   }
 
   Future<MonthlyData> fetchMonthlyData() async {
@@ -347,7 +536,9 @@ class GoogleSheetsService {
       final time = row.length > 1 ? '${row[1]}' : '';
       final session = row.length > 2 ? int.tryParse('${row[2]}') ?? 0 : 0;
       final inflow = row.length > 3 ? double.tryParse('${row[3]}') ?? 0.0 : 0.0;
-      final outflow = row.length > 4 ? double.tryParse('${row[4]}') ?? 0.0 : 0.0;
+      final outflow = row.length > 4
+          ? double.tryParse('${row[4]}') ?? 0.0
+          : 0.0;
       return DialysisRow(
         date: date,
         time: time,
@@ -429,7 +620,8 @@ class GoogleSheetsService {
       sheetId,
       includeGridData: false,
     );
-    final existing = spreadsheet.sheets
+    final existing =
+        spreadsheet.sheets
             ?.map((sheet) => sheet.properties?.title)
             .whereType<String>()
             .toSet() ??
@@ -459,10 +651,20 @@ class GoogleSheetsService {
         promptIfNecessary: promptIfNecessary,
       );
       if (client == null) {
+        // ignore: avoid_print
+        print(
+          '[Sheets] _sheetsApi: getAuthenticatedClient 반환 null (promptIfNecessary=$promptIfNecessary)',
+        );
         return null;
       }
       return SheetsApi(client);
-    } catch (_) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[Sheets] _sheetsApi 예외: $e');
+      // ignore: avoid_print
+      print(
+        '[Sheets] _sheetsApi 스택: ${st.toString().split('\n').take(2).join(' ')}',
+      );
       return null;
     }
   }
@@ -473,86 +675,176 @@ class GoogleSheetsService {
         promptIfNecessary: promptIfNecessary,
       );
       if (client == null) {
+        // ignore: avoid_print
+        print(
+          '[Sheets] _driveApi: getAuthenticatedClient 반환 null (promptIfNecessary=$promptIfNecessary)',
+        );
         return null;
       }
       return drive.DriveApi(client);
-    } catch (_) {
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[Sheets] _driveApi 예외: $e');
+      // ignore: avoid_print
+      print(
+        '[Sheets] _driveApi 스택: ${st.toString().split('\n').take(2).join(' ')}',
+      );
       return null;
     }
   }
 
   Future<String> _ensureAppFolder() async {
     _prefs ??= await SharedPreferences.getInstance();
-    final cached = _prefs?.getString('driveFolderId');
-    if (cached != null && cached.isNotEmpty) {
-      final trashedOrMissing = await _isFileTrashedOrMissing(cached);
-      if (!trashedOrMissing) {
-        return cached;
+    try {
+      final cached = _prefs?.getString('driveFolderId');
+      if (cached != null && cached.isNotEmpty) {
+        // ignore: avoid_print
+        print('[Sheets] _ensureAppFolder: 캐시 폴더 ID 확인 중...');
+        final trashedOrMissing = await _isFileTrashedOrMissing(cached);
+        if (!trashedOrMissing) {
+          // ignore: avoid_print
+          print('[Sheets] _ensureAppFolder: 캐시 폴더 사용 folderId=$cached');
+          return cached;
+        }
+        await _prefs?.remove('driveFolderId');
+        // ignore: avoid_print
+        print('[Sheets] _ensureAppFolder: 캐시 폴더 무효(삭제/휴지통) → 재조회');
       }
-      await _prefs?.remove('driveFolderId');
-    }
-    final driveApi = await _driveApi(promptIfNecessary: true);
-    if (driveApi == null) {
-      return '';
-    }
-    final response = await driveApi.files.list(
-      q: "mimeType='application/vnd.google-apps.folder' "
-          "and name='투석결과App' and trashed=false",
-      spaces: 'drive',
-      $fields: 'files(id, name)',
-    );
-    if (response.files != null && response.files!.isNotEmpty) {
-      final folderId = response.files!.first.id ?? '';
+      final driveApi = await _driveApi(promptIfNecessary: true);
+      if (driveApi == null) {
+        // ignore: avoid_print
+        print('[Sheets] _ensureAppFolder: Drive API null → 폴더 없음 반환');
+        return '';
+      }
+      // ignore: avoid_print
+      print('[Sheets] _ensureAppFolder: "투석결과App" 폴더 검색 중...');
+      final response = await driveApi.files.list(
+        q:
+            "mimeType='application/vnd.google-apps.folder' "
+            "and name='투석결과App' and trashed=false",
+        spaces: 'drive',
+        $fields: 'files(id, name)',
+      );
+      if (response.files != null && response.files!.isNotEmpty) {
+        final folderId = response.files!.first.id ?? '';
+        if (folderId.isNotEmpty) {
+          await _prefs?.setString('driveFolderId', folderId);
+          // ignore: avoid_print
+          print('[Sheets] _ensureAppFolder: 기존 폴더 발견 folderId=$folderId');
+          return folderId;
+        }
+      }
+      // ignore: avoid_print
+      print('[Sheets] _ensureAppFolder: 폴더 없음 → 새로 생성');
+      final created = await driveApi.files.create(
+        drive.File(
+          name: '투석결과App',
+          mimeType: 'application/vnd.google-apps.folder',
+        ),
+      );
+      final folderId = created.id ?? '';
       if (folderId.isNotEmpty) {
         await _prefs?.setString('driveFolderId', folderId);
-        return folderId;
+        // ignore: avoid_print
+        print('[Sheets] _ensureAppFolder: 폴더 생성 완료 folderId=$folderId');
       }
+      return folderId;
+    } catch (e, st) {
+      // ignore: avoid_print
+      print('[Sheets] _ensureAppFolder 예외: $e');
+      // ignore: avoid_print
+      print(
+        '[Sheets] _ensureAppFolder 스택: ${st.toString().split('\n').take(2).join(' ')}',
+      );
+      return '';
     }
-    final created = await driveApi.files.create(
-      drive.File(
-        name: '투석결과App',
-        mimeType: 'application/vnd.google-apps.folder',
-      ),
-    );
-    final folderId = created.id ?? '';
-    if (folderId.isNotEmpty) {
-      await _prefs?.setString('driveFolderId', folderId);
-    }
-    return folderId;
   }
 
   Future<void> _moveFileToFolder(String fileId, String folderId) async {
     final driveApi = await _driveApi(promptIfNecessary: true);
     if (driveApi == null) {
+      // ignore: avoid_print
+      print('[Sheets] _moveFileToFolder: Drive API null → 스킵');
       return;
     }
-    final file = await driveApi.files.get(
-      fileId,
-      $fields: 'parents',
-    ) as drive.File;
-    final previousParents = file.parents?.join(',') ?? '';
-    await driveApi.files.update(
-      drive.File(),
-      fileId,
-      addParents: folderId,
-      removeParents: previousParents.isEmpty ? null : previousParents,
-      $fields: 'id, parents',
-    );
+    try {
+      final file =
+          await driveApi.files.get(fileId, $fields: 'parents') as drive.File;
+      final previousParents = file.parents?.join(',') ?? '';
+      await driveApi.files.update(
+        drive.File(),
+        fileId,
+        addParents: folderId,
+        removeParents: previousParents.isEmpty ? null : previousParents,
+        $fields: 'id, parents',
+      );
+      // ignore: avoid_print
+      print(
+        '[Sheets] _moveFileToFolder: 완료 fileId=$fileId → folderId=$folderId',
+      );
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Sheets] _moveFileToFolder 예외: $e');
+    }
   }
 
   Future<bool> _isFileTrashedOrMissing(String fileId) async {
     try {
       final driveApi = await _driveApi(promptIfNecessary: false);
       if (driveApi == null) {
+        // ignore: avoid_print
+        print('[Sheets] _isFileTrashedOrMissing: Drive API null → true(무효 처리)');
         return true;
       }
-      final file = await driveApi.files.get(
-        fileId,
-        $fields: 'trashed',
-      ) as drive.File;
-      return file.trashed == true;
-    } catch (_) {
+      final file =
+          await driveApi.files.get(fileId, $fields: 'trashed') as drive.File;
+      final trashed = file.trashed == true;
+      // ignore: avoid_print
+      print(
+        '[Sheets] _isFileTrashedOrMissing: fileId=$fileId trashed=$trashed',
+      );
+      return trashed;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Sheets] _isFileTrashedOrMissing 예외: $e → true');
       return true;
+    }
+  }
+
+  /// 파일이 지정한 폴더(투석결과App)에 포함되어 있는지 확인한다.
+  /// - 폴더가 비어 있거나, 조회에 실패하면 false 를 반환한다.
+  Future<bool> _isFileInFolder(String fileId, String folderId) async {
+    if (fileId.isEmpty || folderId.isEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] _isFileInFolder: fileId 또는 folderId 비어 있음 → false');
+      return false;
+    }
+    try {
+      final driveApi = await _driveApi(promptIfNecessary: false);
+      if (driveApi == null) {
+        // ignore: avoid_print
+        print('[Sheets] _isFileInFolder: Drive API null → false');
+        return false;
+      }
+      final file =
+          await driveApi.files.get(fileId, $fields: 'parents, trashed')
+              as drive.File;
+      if (file.trashed == true) {
+        // ignore: avoid_print
+        print('[Sheets] _isFileInFolder: fileId=$fileId 휴지통 → false');
+        return false;
+      }
+      final parents = file.parents ?? const <String>[];
+      final inFolder = parents.contains(folderId);
+      // ignore: avoid_print
+      print(
+        '[Sheets] _isFileInFolder: fileId=$fileId folderId=$folderId inFolder=$inFolder parents=${parents.join(",")}',
+      );
+      return inFolder;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Sheets] _isFileInFolder 예외: $e → false');
+      return false;
     }
   }
 
@@ -597,11 +889,7 @@ class DialysisRow {
 }
 
 class WeightEntry {
-  WeightEntry({
-    required this.date,
-    required this.time,
-    required this.weight,
-  });
+  WeightEntry({required this.date, required this.time, required this.weight});
 
   final String date;
   final String time;

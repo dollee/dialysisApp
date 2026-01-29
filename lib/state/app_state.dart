@@ -11,9 +11,9 @@ import '../widgets/contact_picker.dart';
 
 class AppState extends ChangeNotifier {
   AppState()
-      : _authService = GoogleAuthService(),
-        _sheetsService = GoogleSheetsService(),
-        _healthService = HealthService();
+    : _authService = GoogleAuthService(),
+      _sheetsService = GoogleSheetsService(),
+      _healthService = HealthService();
 
   final GoogleAuthService _authService;
   final GoogleSheetsService _sheetsService;
@@ -23,13 +23,23 @@ class AppState extends ChangeNotifier {
   SharedPreferences? _prefs;
   bool _isInitializing = true;
   bool _isSignedIn = false;
+
+  /// 한 번이라도 로그인에 성공한 적이 있으면 true. SharedPreferences에 저장해
+  /// 위젯 재생성/동의 창 후에도 로그인 화면으로 튀지 않게 함.
+  bool _everSignedIn = false;
   bool _writeWeightToHealth = false;
   bool _writeBloodPressureToHealth = false;
   String? _shareEmail;
   final List<DebugLogEntry> _debugLogs = [];
 
+  /// 초기화 시 원격 설정이 없어서 설정 화면을 먼저 보여줘야 할 때 true.
+  /// (AuthGate가 타이밍에 의존하지 않고 바로 설정 화면을 띄우기 위해 사용)
+  bool _shouldShowSettingsAfterInit = false;
+
   bool get isInitializing => _isInitializing;
   bool get isSignedIn => _isSignedIn;
+  bool get everSignedIn => _everSignedIn;
+  bool get shouldShowSettingsAfterInit => _shouldShowSettingsAfterInit;
   bool get writeWeightToHealth => _writeWeightToHealth;
   bool get writeBloodPressureToHealth => _writeBloodPressureToHealth;
   String? get shareEmail => _shareEmail;
@@ -39,56 +49,86 @@ class AppState extends ChangeNotifier {
 
   Future<void> initialize() async {
     _prefs = await SharedPreferences.getInstance();
+    _everSignedIn = _prefs?.getBool('everSignedIn') ?? false;
+    addLog('앱 초기화 시작... (everSignedIn=$_everSignedIn)');
+
+    // 1. 구글 자동 로그인 시도 (가장 먼저 수행)
+    try {
+      final signedInEmail = await _authService.signInSilently();
+      _isSignedIn = signedInEmail != null;
+      if (_isSignedIn) {
+        _everSignedIn = true;
+        await _prefs?.setBool('everSignedIn', true);
+      }
+
+      if (_isSignedIn) {
+        addLog('구글 로그인 성공: $signedInEmail');
+        await _sheetsService.bindAuth(_authService);
+        addLog('bindAuth 완료');
+
+        // 2. 로그인 성공 시 필요한 원격 설정값 및 시트 확인
+        addLog('Drive 권한 확인 중...');
+        final hasAccess = await _authService.hasDriveAccess();
+        addLog('Drive 권한: ${hasAccess ? "있음" : "없음"}');
+        if (hasAccess) {
+          // 설정 파일만 먼저 확인해 화면 전환(설정/홈)을 빨리 결정하고, 월별/재고 시트는 백그라운드에서 진행
+          try {
+            addLog('설정 파일 확인 중...');
+            await _sheetsService.ensureSettingsSheet();
+            addLog('원격 설정 로드 중...');
+            final remoteSettings = await _sheetsService.loadSettingsFromSheet();
+            addLog(
+              '원격 설정: ${remoteSettings.isEmpty ? "없음(0개)" : "${remoteSettings.length}개 키"}',
+            );
+            if (remoteSettings.isEmpty) {
+              await _prefs?.remove('patientName');
+              await _prefs?.remove('hospitalName');
+              _shouldShowSettingsAfterInit = true;
+              addLog('로컬 프로필 제거함(원격 설정 없음 → 설정 화면 유도)');
+            } else {
+              _shouldShowSettingsAfterInit = false;
+            }
+          } catch (e, st) {
+            addLog('시트 연결 중 오류: $e');
+            addLog('스택: ${st.toString().split('\n').take(3).join(' | ')}');
+            _shouldShowSettingsAfterInit = true;
+          }
+
+          // 월별·재고 시트는 백그라운드에서 진행 (설정 화면을 먼저 띄우기 위해 대기하지 않음)
+          Future(() async {
+            try {
+              addLog('월별 시트 확인 중...');
+              await _sheetsService.ensureCurrentMonthSheet();
+              addLog('월별 시트 확인 완료');
+              addLog('재고 시트 확인 중...');
+              await _sheetsService.ensureInventorySheet();
+              addLog('재고 시트 확인 완료');
+            } catch (e) {
+              addLog('백그라운드 시트 확인 오류: $e');
+            }
+          });
+        } else {
+          await _prefs?.remove('patientName');
+          await _prefs?.remove('hospitalName');
+          _shouldShowSettingsAfterInit = true;
+          addLog('로컬 프로필 제거함(Drive 권한 없음)');
+        }
+      } else {
+        addLog('자동 로그인 실패: 로그인이 필요합니다.');
+      }
+    } catch (e) {
+      addLog('초기화 중 인증 에러: $e');
+      _isSignedIn = false;
+    }
+
+    // 3. 로컬 설정값 로드
     _writeWeightToHealth = _prefs?.getBool('writeWeightToHealth') ?? false;
     _writeBloodPressureToHealth =
         _prefs?.getBool('writeBloodPressureToHealth') ?? false;
     _shareEmail = _prefs?.getString('shareEmail');
 
-    final signedInEmail = await _authService.signInSilently();
-    _isSignedIn = signedInEmail != null;
-    if (_isSignedIn) {
-      await _sheetsService.bindAuth(_authService);
-      if (signedInEmail != null && signedInEmail.isNotEmpty) {
-        addLog('구글 계정: $signedInEmail');
-      }
-      if (await _authService.hasDriveAccess()) {
-        await _sheetsService.ensureCurrentMonthSheet();
-        try {
-          final sheetId = await _sheetsService.ensureInventorySheet();
-          final driveEmail = await _sheetsService.getDriveUserEmail();
-          if (driveEmail.isNotEmpty) {
-            addLog('드라이브 API 계정: $driveEmail');
-          }
-          if (sheetId.isNotEmpty) {
-            addLog('재고 시트 확인: $sheetId');
-          }
-          final info = await _sheetsService.getInventoryStorageInfo();
-          addLog(
-            '재고 저장 위치: '
-            'file=${info.fileName.isEmpty ? 'unknown' : info.fileName} '
-            'sheetId=${info.sheetId.isEmpty ? 'none' : info.sheetId} '
-            'folderId=${info.folderId.isEmpty ? 'none' : info.folderId} '
-            'parents=${info.parentIds.isEmpty ? 'none' : info.parentIds} '
-            'link=${info.webViewLink.isEmpty ? 'none' : info.webViewLink} '
-            'trashed=${info.trashed} '
-            'error=${info.errorMessage.isEmpty ? 'none' : info.errorMessage}',
-          );
-        } catch (error) {
-          addLog('재고 시트 생성 실패: $error');
-        }
-      } else {
-        addLog('드라이브 권한 없음: 동기화 대기');
-      }
-      if (_shareEmail != null && _shareEmail!.isNotEmpty) {
-        if (await _authService.hasDriveAccess()) {
-          await _sheetsService.shareAppFolder(_shareEmail!);
-        } else {
-          addLog('공유 요청 보류: 드라이브 권한 필요');
-        }
-      }
-    }
-
     _isInitializing = false;
+    addLog('앱 초기화 완료. isSignedIn=$_isSignedIn');
     notifyListeners();
   }
 
@@ -103,6 +143,8 @@ class AppState extends ChangeNotifier {
       }
       _isSignedIn = signedInEmail != null;
       if (_isSignedIn) {
+        _everSignedIn = true;
+        await _prefs?.setBool('everSignedIn', true);
         await _secureStorage.write(
           key: 'googleUserEmail',
           value: signedInEmail ?? '',
@@ -111,10 +153,15 @@ class AppState extends ChangeNotifier {
         if (signedInEmail != null && signedInEmail.isNotEmpty) {
           addLog('구글 계정: $signedInEmail');
         }
+        addLog('Drive 권한 확인 중(signIn 후)...');
         if (await _authService.hasDriveAccess()) {
+          addLog('Drive 권한 있음 → 시트 확인');
           await _sheetsService.ensureCurrentMonthSheet();
           try {
             final sheetId = await _sheetsService.ensureInventorySheet();
+            addLog(
+              'ensureInventorySheet 반환: ${sheetId.isEmpty ? "빈 ID" : "sheetId=$sheetId"}',
+            );
             final driveEmail = await _sheetsService.getDriveUserEmail();
             if (driveEmail.isNotEmpty) {
               addLog('드라이브 API 계정: $driveEmail');
@@ -130,8 +177,9 @@ class AppState extends ChangeNotifier {
               'trashed=${info.trashed} '
               'error=${info.errorMessage.isEmpty ? 'none' : info.errorMessage}',
             );
-          } catch (error) {
+          } catch (error, st) {
             addLog('재고 시트 생성 실패: $error');
+            addLog('스택: ${st.toString().split('\n').take(3).join(' | ')}');
           }
         } else {
           addLog('드라이브 권한 없음: 동기화 대기');
@@ -155,6 +203,8 @@ class AppState extends ChangeNotifier {
     await _authService.signOut();
     await _secureStorage.delete(key: 'googleUserEmail');
     _isSignedIn = false;
+    _everSignedIn = false;
+    await _prefs?.remove('everSignedIn');
     notifyListeners();
   }
 
@@ -177,13 +227,26 @@ class AppState extends ChangeNotifier {
   }
 
   void addLog(String message) {
-    _debugLogs.insert(0, DebugLogEntry(DateTime.now(), message));
+    final entry = DebugLogEntry(DateTime.now(), message);
+    // 1) 앱 내 디버그 로그 리스트
+    _debugLogs.insert(0, entry);
+    // 2) 터미널 출력 (flutter run 시 터미널에 표시)
+    // ignore: avoid_print
+    print('[DEBUG] ${entry.timestamp.toIso8601String()}  ${entry.message}');
     notifyListeners();
   }
 
   void clearLogs() {
     _debugLogs.clear();
     notifyListeners();
+  }
+
+  /// 설정 화면에서 완료했을 때 호출. 다음부터는 홈을 보여주기 위해 플래그를 지운다.
+  void clearShouldShowSettingsAfterInit() {
+    if (_shouldShowSettingsAfterInit) {
+      _shouldShowSettingsAfterInit = false;
+      notifyListeners();
+    }
   }
 
   Future<bool> hasRequiredProfile() async {
@@ -232,10 +295,12 @@ class AppState extends ChangeNotifier {
       }
     }
 
-    addLog('배송요청 판단 값: owned=${owned.values.join(",")} '
-        'pending=${pending.values.join(",")} '
-        'thresholds=${thresholds.map((v) => v ?? 0).join(",")} '
-        'needsRequest=$needsRequest');
+    addLog(
+      '배송요청 판단 값: owned=${owned.values.join(",")} '
+      'pending=${pending.values.join(",")} '
+      'thresholds=${thresholds.map((v) => v ?? 0).join(",")} '
+      'needsRequest=$needsRequest',
+    );
 
     if (!needsRequest) {
       return;
@@ -333,13 +398,10 @@ class AppState extends ChangeNotifier {
     _prefs ??= await SharedPreferences.getInstance();
     final autoRequest = _prefs?.getBool('autoDeliveryRequest') ?? false;
     final owned = await _sheetsService.fetchLatestInventory('owned');
-    final updated = List<int>.generate(
-      owned.values.length,
-      (index) {
-        final next = owned.values[index] - (deltas[index]);
-        return next < 0 ? 0 : next;
-      },
-    );
+    final updated = List<int>.generate(owned.values.length, (index) {
+      final next = owned.values[index] - (deltas[index]);
+      return next < 0 ? 0 : next;
+    });
     addLog('보유수량 변경: ${owned.values.join(",")} -> ${updated.join(",")}');
     await _sheetsService.appendInventory(
       'owned',
@@ -391,9 +453,7 @@ class AppState extends ChangeNotifier {
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: '전화번호 입력',
-            ),
+            decoration: const InputDecoration(labelText: '전화번호 입력'),
           ),
           actions: [
             TextButton(

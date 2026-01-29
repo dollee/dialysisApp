@@ -41,9 +41,7 @@ class DialysisApp extends StatelessWidget {
             ),
           ),
           inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: Colors.blue, width: 2),
@@ -65,6 +63,7 @@ class AuthGate extends StatefulWidget {
 
 class _AuthGateState extends State<AuthGate> {
   bool? _hasProfile;
+  bool _didRecheckAfterInit = false;
 
   @override
   void initState() {
@@ -82,10 +81,10 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   void _handleProfileCompleted() {
+    context.read<AppState>().clearShouldShowSettingsAfterInit();
     setState(() {
       _hasProfile = true;
     });
-    // 설정 완료 후 로그인/홈 화면으로 부드럽게 전환
     if (mounted) {
       setState(() {});
     }
@@ -95,27 +94,32 @@ class _AuthGateState extends State<AuthGate> {
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, state, _) {
+        // 초기화가 끝나면 프로필을 한 번 더 확인 (설정 화면에서 완료 후 홈으로 갈 때 등)
+        if (!state.isInitializing && !_didRecheckAfterInit) {
+          _didRecheckAfterInit = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _checkProfile();
+          });
+        }
         late final Widget screen;
         if (state.isInitializing || _hasProfile == null) {
           screen = const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
-        } else if (_hasProfile == false) {
+        } else if (!state.isSignedIn && !state.everSignedIn) {
+          screen = const LoginScreen();
+        } else if (state.shouldShowSettingsAfterInit || _hasProfile == false) {
+          // 원격 설정이 없거나 로컬 프로필이 없으면 설정 화면 먼저
           screen = SettingsScreen(
             requireProfile: true,
             onCompleted: _handleProfileCompleted,
           );
-        } else if (!state.isSignedIn) {
-          screen = const LoginScreen();
         } else {
           screen = const HomeScreen();
         }
         return AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
-          child: KeyedSubtree(
-            key: ValueKey(screen.runtimeType),
-            child: screen,
-          ),
+          child: KeyedSubtree(key: ValueKey(screen.runtimeType), child: screen),
         );
       },
     );
