@@ -165,15 +165,15 @@ class InventorySection extends StatelessWidget {
         Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 12),
         _InventoryGroup(
-          title: '1-5',
+          title: '손투석',
           startIndex: 0,
-          endIndex: 4,
+          endIndex: 2,
           controller: controller,
         ),
         const SizedBox(height: 12),
         _InventoryGroup(
-          title: '6-8',
-          startIndex: 5,
+          title: '기계투석',
+          startIndex: 3,
           endIndex: 7,
           controller: controller,
         ),
@@ -207,7 +207,7 @@ class _InventoryGroup extends StatelessWidget {
     '1.5 3리터',
     '2.3 3리터',
     '4.3 3리터',
-    '셋트',
+    '세트',
     '배액백',
   ];
 

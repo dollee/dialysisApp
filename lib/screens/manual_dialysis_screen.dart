@@ -134,6 +134,18 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
         await context.read<AppState>().maybeRequestDelivery(context);
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
+    } catch (e) {
+      if (mounted) {
+        context.read<AppState>().addLog('손투석 저장 실패: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              e is StateError ? e.message : '저장에 실패했습니다. 다시 시도해주세요.',
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _saving = false);

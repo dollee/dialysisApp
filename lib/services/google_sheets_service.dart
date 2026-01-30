@@ -24,6 +24,7 @@ class GoogleSheetsService {
   static const _settingsFilePrefKey = 'settingsSheetId';
 
   Future<void> ensureCurrentMonthSheet() async {
+    _prefs ??= await SharedPreferences.getInstance();
     final monthKey = _currentMonthKey();
     final existingId = _prefs?.getString(_sheetIdKey(monthKey));
     // 이미 저장된 월별 시트 ID가 있을 때, 위치와 상태를 검증한다.
@@ -46,7 +47,8 @@ class GoogleSheetsService {
     }
 
     final folderId = await _ensureAppFolder();
-    final sheetsApi = await _sheetsApi(promptIfNecessary: false);
+    // 새 시트 생성 시 필요하면 재인증 유도(promptIfNecessary: true)해 데이터 반영 보장
+    final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
       return;
     }
@@ -551,11 +553,16 @@ class GoogleSheetsService {
 
   Future<void> _appendRows(String sheetName, List<List<Object?>> rows) async {
     if (rows.isEmpty) return;
+    final sheetId = await _currentSheetId();
+    if (sheetId.isEmpty) {
+      throw StateError(
+        '월별 데이터 시트가 없습니다. 앱을 다시 실행하거나 로그인 후 다시 시도해주세요.',
+      );
+    }
     final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
-      return;
+      throw StateError('Google 시트 연결에 실패했습니다. 로그인 상태를 확인해주세요.');
     }
-    final sheetId = await _currentSheetId();
     final valueRange = ValueRange(values: rows);
     await sheetsApi.spreadsheets.values.append(
       valueRange,
@@ -862,8 +869,8 @@ class GoogleSheetsService {
       '4.3 2리터',
       '1.5 3리터',
       '2.3 3리터',
-      '4.3 f리터',
-      '겟트',
+      '4.3 3리터',
+      '세트',
       '배액백',
       'auto_request',
     ];
