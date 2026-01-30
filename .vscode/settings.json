@@ -1,7 +1,8 @@
 {
-    "geminicodeassist.project": "dialysisapp-AIzaSyAOjxh4fs_vk3eDw0jwwt8tmUhoidR7mRw",
-    "geminicodeassist.agent.additionalTrustedCertificates": "AIzaSyAOjxh4fs_vk3eDw0jwwt8tmUhoidR7mRw",
+    "geminicodeassist.project": "dialysisapp-484513",
+    "geminicodeassist.agent.additionalTrustedCertificates": "dialysisapp-484513",
     "geminicodeassist.agentDebugMode": true,
     "geminicodeassist.agentYoloMode": true,
-    "geminicodeassist.codeGenerationPaneViewEnabled": true
+    "geminicodeassist.codeGenerationPaneViewEnabled": true,
+    "cmake.sourceDirectory": "/Users/dollee/App/dialysis_app/linux"
 }

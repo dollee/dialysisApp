@@ -127,9 +127,9 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
       await context.read<AppState>().sheetsService.appendManualDialysis(rows);
       if (mounted) {
         context.read<AppState>().addLog('손투석 입력 저장: ${rows.length}건');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('저장되었습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('저장되었습니다.')));
         await context.read<AppState>().applyManualConsumption(_bagValue);
         await context.read<AppState>().maybeRequestDelivery(context);
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -223,10 +223,7 @@ class _ManualDialysisScreenState extends State<ManualDialysisScreen> {
             else
               Text('회차: ${_baseSession + 1}'),
             const SizedBox(height: 12),
-            _DialysisRowCard(
-              index: _baseSession + 1,
-              row: _row,
-            ),
+            _DialysisRowCard(index: _baseSession + 1, row: _row),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _saving ? null : _save,
@@ -269,10 +266,7 @@ class _DialysisRowCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            SizedBox(
-              width: 60,
-              child: Text('회차 $index'),
-            ),
+            SizedBox(width: 60, child: Text('회차 $index')),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(

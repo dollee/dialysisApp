@@ -65,8 +65,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 InventorySection(
                   title: '미배송분 관리',
                   controller: _pending,
-                  onSave: () =>
-                      _saveSection(context, 'pending', _pending.currentValues()),
+                  onSave: () => _saveSection(
+                    context,
+                    'pending',
+                    _pending.currentValues(),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 InventorySection(
@@ -96,12 +99,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
       await prefs.setBool('deliveryRequestGate', false);
     }
     if (mounted) {
-      context.read<AppState>().addLog(
-            '재고 저장($section): ${values.join(",")}',
-          );
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('저장되었습니다.')),
-      );
+      context.read<AppState>().addLog('재고 저장($section): ${values.join(",")}');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('저장되었습니다.')));
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -111,7 +112,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
 class InventorySectionController {
   InventorySectionController()
-      : controllers = List.generate(8, (_) => TextEditingController());
+    : controllers = List.generate(8, (_) => TextEditingController());
 
   final List<TextEditingController> controllers;
 
@@ -162,7 +163,10 @@ class InventorySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 12),
         _InventoryGroup(
           title: '손투석',
@@ -178,10 +182,7 @@ class InventorySection extends StatelessWidget {
           controller: controller,
         ),
         const SizedBox(height: 12),
-        ElevatedButton(
-          onPressed: onSave,
-          child: const Text('저장'),
-        ),
+        ElevatedButton(onPressed: onSave, child: const Text('저장')),
       ],
     );
   }

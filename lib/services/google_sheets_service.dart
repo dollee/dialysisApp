@@ -555,9 +555,7 @@ class GoogleSheetsService {
     if (rows.isEmpty) return;
     final sheetId = await _currentSheetId();
     if (sheetId.isEmpty) {
-      throw StateError(
-        '월별 데이터 시트가 없습니다. 앱을 다시 실행하거나 로그인 후 다시 시도해주세요.',
-      );
+      throw StateError('월별 데이터 시트가 없습니다. 앱을 다시 실행하거나 로그인 후 다시 시도해주세요.');
     }
     final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
@@ -859,7 +857,76 @@ class GoogleSheetsService {
     return DateFormat('yyyy-MM').format(DateTime.now());
   }
 
+  String _previousMonthKey(String monthKey) {
+    try {
+      final d = DateFormat('yyyy-MM').parse(monthKey);
+      final prev = DateTime(d.year, d.month - 1, 1);
+      return DateFormat('yyyy-MM').format(prev);
+    } catch (_) {
+      return monthKey;
+    }
+  }
+
   String _sheetIdKey(String monthKey) => 'sheetId_$monthKey';
+
+  /// 오늘 포함 최근 30일 데이터 (추이 화면용). 현재월·전월 시트에서 병합 후 기간 필터.
+  Future<MonthlyData> fetchLast30DaysData() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    final now = DateTime.now();
+    final endDate = DateTime(now.year, now.month, now.day);
+    final startDate = endDate.subtract(const Duration(days: 29));
+    final startStr = DateFormat('yyyy-MM-dd').format(startDate);
+    final endStr = DateFormat('yyyy-MM-dd').format(endDate);
+
+    final monthKey = _currentMonthKey();
+    final currentSheetId = await _currentSheetId();
+    List<WeightEntry> weight = [];
+    List<BloodPressureEntry> bloodPressure = [];
+    List<DialysisRow> machineDialysis = [];
+    List<DialysisRow> manualDialysis = [];
+
+    if (currentSheetId.isNotEmpty) {
+      weight = _mapWeight(await _getValuesById(currentSheetId, 'weight!A2:C'));
+      bloodPressure = _mapPressure(
+        await _getValuesById(currentSheetId, 'blood_pressure!A2:D'),
+      );
+      machineDialysis = _mapDialysis(
+        await _getValuesById(currentSheetId, 'dialysis_machine!A2:E'),
+      );
+      manualDialysis = _mapDialysis(
+        await _getValuesById(currentSheetId, 'dialysis_manual!A2:E'),
+      );
+    }
+
+    final prevMonthKey = _previousMonthKey(monthKey);
+    final prevSheetId = _prefs?.getString(_sheetIdKey(prevMonthKey)) ?? '';
+    if (prevSheetId.isNotEmpty) {
+      final sheetsApi = await _sheetsApi(promptIfNecessary: false);
+      if (sheetsApi != null) {
+        try {
+          final pm = await _getValuesById(prevSheetId, 'dialysis_machine!A2:E');
+          final pma = await _getValuesById(prevSheetId, 'dialysis_manual!A2:E');
+          final pw = await _getValuesById(prevSheetId, 'weight!A2:C');
+          final pp = await _getValuesById(prevSheetId, 'blood_pressure!A2:D');
+          machineDialysis = [..._mapDialysis(pm), ...machineDialysis];
+          manualDialysis = [..._mapDialysis(pma), ...manualDialysis];
+          weight = [..._mapWeight(pw), ...weight];
+          bloodPressure = [..._mapPressure(pp), ...bloodPressure];
+        } catch (_) {}
+      }
+    }
+
+    bool inRange(String dateStr) {
+      return dateStr.compareTo(startStr) >= 0 && dateStr.compareTo(endStr) <= 0;
+    }
+
+    return MonthlyData(
+      weight: weight.where((e) => inRange(e.date)).toList(),
+      bloodPressure: bloodPressure.where((e) => inRange(e.date)).toList(),
+      machineDialysis: machineDialysis.where((e) => inRange(e.date)).toList(),
+      manualDialysis: manualDialysis.where((e) => inRange(e.date)).toList(),
+    );
+  }
 
   List<Object?> _inventoryHeaderRow() {
     return [

@@ -115,13 +115,15 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
       for (var i = 0; i < pairs.length; i++) {
         final p = pairs[i];
         // ignore: avoid_print
-        print('[OCR]   쌍[$i] 회차=${p.sessionIndex >= 0 ? p.sessionIndex + 1 : "?"} 주입=${p.inflow} 배액=${p.outflow}');
+        print(
+          '[OCR]   쌍[$i] 회차=${p.sessionIndex >= 0 ? p.sessionIndex + 1 : "?"} 주입=${p.inflow} 배액=${p.outflow}',
+        );
       }
       if (pairs.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미지에서 값을 찾지 못했습니다.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('이미지에서 값을 찾지 못했습니다.')));
         }
         return;
       }
@@ -182,7 +184,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
         if (lineText.isEmpty) continue;
 
         // ignore: avoid_print
-        print('[OCR:parse] 줄[$lineIndex] 원문="$lineText" elements=${line.elements.length}');
+        print(
+          '[OCR:parse] 줄[$lineIndex] 원문="$lineText" elements=${line.elements.length}',
+        );
 
         final numericElements = <_NumericElement>[];
         for (final element in line.elements) {
@@ -197,14 +201,18 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
             final value = match?.group(1)?.replaceAll(',', '.');
             parsed = value == null ? null : double.tryParse(value);
             // ignore: avoid_print
-            print('[OCR:parse]   요소 raw="$raw" left=${element.boundingBox.left} top=${element.boundingBox.top} → parsed=$parsed');
+            print(
+              '[OCR:parse]   요소 raw="$raw" left=${element.boundingBox.left} top=${element.boundingBox.top} → parsed=$parsed',
+            );
           }
           if (parsed != null) {
             final left = element.boundingBox.left;
             final top = element.boundingBox.top;
             numericElements.add(_NumericElement(value: parsed, left: left));
             allNumbers.add(parsed);
-            spatialNumbers.add(_SpatialNum(value: parsed, left: left, top: top));
+            spatialNumbers.add(
+              _SpatialNum(value: parsed, left: left, top: top),
+            );
           }
         }
 
@@ -218,7 +226,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
 
         final values = numericElements.map((e) => e.value).toList();
         // ignore: avoid_print
-        print('[OCR:parse]   정렬 후 values=$values lefts=${numericElements.map((e) => e.left.toStringAsFixed(0)).toList()}');
+        print(
+          '[OCR:parse]   정렬 후 values=$values lefts=${numericElements.map((e) => e.left.toStringAsFixed(0)).toList()}',
+        );
         final lefts = numericElements.map((e) => e.left).toList()..sort();
         final minLeft = lefts.first;
         final maxLeft = lefts.last;
@@ -248,7 +258,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
           final inflow = inflowElement.value;
           final outflow = outflowElement.value;
           // ignore: avoid_print
-          print('[OCR:parse]   분기: 3요소(위치기반) session=$session inflow=$inflow outflow=$outflow');
+          print(
+            '[OCR:parse]   분기: 3요소(위치기반) session=$session inflow=$inflow outflow=$outflow',
+          );
           if (session <= 99 &&
               inflow >= 0 &&
               outflow >= 0 &&
@@ -256,7 +268,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
               inflow != outflow) {
             pairs.add(_DialysisPair(inflow, outflow, session.toInt()));
             // ignore: avoid_print
-            print('[OCR:parse]   → 추가 (위치기반) 회차${session.toInt() + 1} ($inflow, $outflow)');
+            print(
+              '[OCR:parse]   → 추가 (위치기반) 회차${session.toInt() + 1} ($inflow, $outflow)',
+            );
             lineIndex++;
             continue;
           }
@@ -296,7 +310,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
             values[0] >= 0) {
           pairs.add(_DialysisPair(0, values[1], values[0].toInt()));
           // ignore: avoid_print
-          print('[OCR:parse]   → 추가 (행번호+값1) 회차${values[0].toInt() + 1} (0, ${values[1]})');
+          print(
+            '[OCR:parse]   → 추가 (행번호+값1) 회차${values[0].toInt() + 1} (0, ${values[1]})',
+          );
           lineIndex++;
           continue;
         }
@@ -305,11 +321,14 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
         if (values.length >= 2) {
           final inflow = values[values.length - 2];
           final outflow = values.last;
-          final bothLarge = inflow >= 100 && outflow >= 100 && inflow != outflow;
+          final bothLarge =
+              inflow >= 100 && outflow >= 100 && inflow != outflow;
           final oneZero =
               (inflow == 0 && outflow > 0) || (inflow > 0 && outflow == 0);
           // ignore: avoid_print
-          print('[OCR:parse]   분기: 2값 inflow=$inflow outflow=$outflow bothLarge=$bothLarge oneZero=$oneZero');
+          print(
+            '[OCR:parse]   분기: 2값 inflow=$inflow outflow=$outflow bothLarge=$bothLarge oneZero=$oneZero',
+          );
           if (bothLarge || oneZero) {
             pairs.add(_DialysisPair(inflow, outflow));
             // ignore: avoid_print
@@ -335,7 +354,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
           }
         }
         // ignore: avoid_print
-        print('[OCR:parse]   inline(정규식) normalized="$normalizedLine" numbers=$inlineNumbers');
+        print(
+          '[OCR:parse]   inline(정규식) normalized="$normalizedLine" numbers=$inlineNumbers',
+        );
         if (inlineNumbers.length >= 3) {
           final first = inlineNumbers[0];
           final second = inlineNumbers[1];
@@ -347,7 +368,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
               second != third) {
             pairs.add(_DialysisPair(second, third, first.toInt()));
             // ignore: avoid_print
-            print('[OCR:parse]   → 추가 (inline 3값) 회차${first.toInt() + 1} ($second, $third)');
+            print(
+              '[OCR:parse]   → 추가 (inline 3값) 회차${first.toInt() + 1} ($second, $third)',
+            );
           } else if (first >= 100 && second == third && second >= 0) {
             pairs.add(_DialysisPair(first, second));
             // ignore: avoid_print
@@ -359,9 +382,13 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
         } else if (inlineNumbers.length == 2 &&
             inlineNumbers[0] <= 99 &&
             inlineNumbers[1] > 0) {
-          pairs.add(_DialysisPair(0, inlineNumbers[1], inlineNumbers[0].toInt()));
+          pairs.add(
+            _DialysisPair(0, inlineNumbers[1], inlineNumbers[0].toInt()),
+          );
           // ignore: avoid_print
-          print('[OCR:parse]   → 추가 (inline 행번호+값1) 회차${inlineNumbers[0].toInt() + 1} (0, ${inlineNumbers[1]})');
+          print(
+            '[OCR:parse]   → 추가 (inline 행번호+값1) 회차${inlineNumbers[0].toInt() + 1} (0, ${inlineNumbers[1]})',
+          );
         } else if (inlineNumbers.length >= 2) {
           final a = inlineNumbers[inlineNumbers.length - 2];
           final b = inlineNumbers.last;
@@ -398,7 +425,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
     // 줄 단위로 쌍을 못 찾았을 때만: 100 이상 숫자만 나열해 (0,1),(2,3)... 짝 지음.
     final filteredNumbers = allNumbers.where((value) => value >= 100).toList();
     // ignore: avoid_print
-    print('[OCR:parse] fallback: 100 이상 숫자 ${filteredNumbers.length}개 = $filteredNumbers');
+    print(
+      '[OCR:parse] fallback: 100 이상 숫자 ${filteredNumbers.length}개 = $filteredNumbers',
+    );
     if (filteredNumbers.length >= 2 &&
         filteredNumbers.length <= 20 &&
         filteredNumbers.length.isEven) {
@@ -547,12 +576,10 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
     try {
       await context.read<AppState>().sheetsService.appendMachineDialysis(rows);
       if (mounted) {
-        context
-            .read<AppState>()
-            .addLog('기계투석 입력 저장: ${rows.length}건');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('저장되었습니다.')),
-        );
+        context.read<AppState>().addLog('기계투석 입력 저장: ${rows.length}건');
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('저장되었습니다.')));
         await context.read<AppState>().applyMachineConsumption();
         await context.read<AppState>().maybeRequestDelivery(context);
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -625,10 +652,7 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
             ),
             const SizedBox(height: 12),
             for (var i = 0; i < _rows.length; i++)
-              _DialysisRowCard(
-                index: i + 1,
-                row: _rows[i],
-              ),
+              _DialysisRowCard(index: i + 1, row: _rows[i]),
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _saving ? null : _save,
@@ -644,7 +668,9 @@ class _MachineDialysisScreenState extends State<MachineDialysisScreen> {
             ElevatedButton(
               onPressed: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ManualDialysisScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const ManualDialysisScreen(),
+                  ),
                 );
               },
               child: const Text('손투석 입력'),
@@ -671,6 +697,7 @@ class _DialysisPair {
 
   final double inflow;
   final double outflow;
+
   /// 기기 화면 행 번호 (00→0, 01→1, …). -1이면 미확인.
   final int sessionIndex;
 }
@@ -708,10 +735,7 @@ class _DialysisRowCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            SizedBox(
-              width: 60,
-              child: Text('회차 $index'),
-            ),
+            SizedBox(width: 60, child: Text('회차 $index')),
             const SizedBox(width: 8),
             Expanded(
               child: TextField(

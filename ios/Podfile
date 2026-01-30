@@ -44,8 +44,6 @@ post_install do |installer|
         '$(inherited)',
         'PERMISSION_CONTACTS=1',
       ]
-      # 시뮬레이터 빌드 시 arm64 아키텍처 제외 (ML Kit 충돌 해결)
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
     end
   end
 end
