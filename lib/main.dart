@@ -64,6 +64,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   bool? _hasProfile;
   bool _didRecheckAfterInit = false;
+  bool _didRecheckAfterSignIn = false;
 
   @override
   void initState() {
@@ -99,6 +100,15 @@ class _AuthGateState extends State<AuthGate> {
           _didRecheckAfterInit = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) _checkProfile();
+          });
+        }
+        // 구글 로그인 직후 프로필 재확인 → 원격 설정에서 프로필 적용 시 홈으로 전환
+        if (!state.isSignedIn) {
+          _didRecheckAfterSignIn = false;
+        } else if (!_didRecheckAfterSignIn) {
+          _didRecheckAfterSignIn = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            if (mounted) await _checkProfile();
           });
         }
         late final Widget screen;

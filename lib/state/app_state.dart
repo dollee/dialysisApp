@@ -156,6 +156,21 @@ class AppState extends ChangeNotifier {
         addLog('Drive 권한 확인 중(signIn 후)...');
         if (await _authService.hasDriveAccess()) {
           addLog('Drive 권한 있음 → 시트 확인');
+          try {
+            await _sheetsService.ensureSettingsSheet();
+            final remoteSettings = await _sheetsService.loadSettingsFromSheet();
+            if (remoteSettings.isNotEmpty) {
+              final patient = remoteSettings['patientName']?.trim() ?? '';
+              final hospital = remoteSettings['hospitalName']?.trim() ?? '';
+              if (patient.isNotEmpty && hospital.isNotEmpty) {
+                await _prefs?.setString('patientName', patient);
+                await _prefs?.setString('hospitalName', hospital);
+                addLog('원격 설정에서 프로필 적용 → 홈으로 이동');
+              }
+            }
+          } catch (e) {
+            addLog('로그인 후 설정 로드 중 오류: $e');
+          }
           await _sheetsService.ensureCurrentMonthSheet();
           try {
             final sheetId = await _sheetsService.ensureInventorySheet();

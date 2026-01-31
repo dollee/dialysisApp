@@ -5,6 +5,15 @@ allprojects {
     }
 }
 
+// 플러그인(contacts_service 등)의 Java 8 사용 경고 억제
+subprojects {
+    afterEvaluate {
+        tasks.withType<JavaCompile>().configureEach {
+            options.compilerArgs.add("-Xlint:-options")
+        }
+    }
+}
+
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory
         .dir("../../build")

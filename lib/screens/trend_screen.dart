@@ -60,13 +60,18 @@ class _TrendScreenState extends State<TrendScreen> {
                 decoration: const InputDecoration(
                   labelText: '시리즈 선택',
                   border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
                 items: options
-                    .map((e) => DropdownMenuItem<String>(
-                          value: e.id,
-                          child: Text(e.label),
-                        ))
+                    .map(
+                      (e) => DropdownMenuItem<String>(
+                        value: e.id,
+                        child: Text(e.label),
+                      ),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value != null) setState(() => _selectedSeriesId = value);
@@ -107,18 +112,41 @@ class _TrendScreenState extends State<TrendScreen> {
                   icon: const Icon(Icons.remove_circle_outline, size: 20),
                   onPressed: _chartHeight <= _minChartHeight
                       ? null
-                      : () => setState(() => _chartHeight = (_chartHeight - 40).clamp(_minChartHeight, _maxChartHeight)),
+                      : () => setState(
+                          () => _chartHeight = (_chartHeight - 40).clamp(
+                            _minChartHeight,
+                            _maxChartHeight,
+                          ),
+                        ),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
-                SizedBox(width: 28, child: Text('${_chartHeight.toInt()}', style: const TextStyle(fontSize: 12), textAlign: TextAlign.center)),
+                SizedBox(
+                  width: 28,
+                  child: Text(
+                    '${_chartHeight.toInt()}',
+                    style: const TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline, size: 20),
                   onPressed: _chartHeight >= _maxChartHeight
                       ? null
-                      : () => setState(() => _chartHeight = (_chartHeight + 40).clamp(_minChartHeight, _maxChartHeight)),
+                      : () => setState(
+                          () => _chartHeight = (_chartHeight + 40).clamp(
+                            _minChartHeight,
+                            _maxChartHeight,
+                          ),
+                        ),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
               ],
             ),
@@ -131,18 +159,37 @@ class _TrendScreenState extends State<TrendScreen> {
                   icon: const Icon(Icons.remove_circle_outline, size: 20),
                   onPressed: _chartWidthFactor <= _minWidthFactor
                       ? null
-                      : () => setState(() => _chartWidthFactor = (_chartWidthFactor - 0.25).clamp(_minWidthFactor, _maxWidthFactor)),
+                      : () => setState(
+                          () => _chartWidthFactor = (_chartWidthFactor - 0.25)
+                              .clamp(_minWidthFactor, _maxWidthFactor),
+                        ),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
-                SizedBox(width: 36, child: Text('${(_chartWidthFactor * 100).toInt()}%', style: const TextStyle(fontSize: 12), textAlign: TextAlign.center)),
+                SizedBox(
+                  width: 36,
+                  child: Text(
+                    '${(_chartWidthFactor * 100).toInt()}%',
+                    style: const TextStyle(fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
                 IconButton(
                   icon: const Icon(Icons.add_circle_outline, size: 20),
                   onPressed: _chartWidthFactor >= _maxWidthFactor
                       ? null
-                      : () => setState(() => _chartWidthFactor = (_chartWidthFactor + 0.25).clamp(_minWidthFactor, _maxWidthFactor)),
+                      : () => setState(
+                          () => _chartWidthFactor = (_chartWidthFactor + 0.25)
+                              .clamp(_minWidthFactor, _maxWidthFactor),
+                        ),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                 ),
               ],
             ),
@@ -157,7 +204,10 @@ class _TrendScreenState extends State<TrendScreen> {
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('원래대로'),
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -202,7 +252,10 @@ class _TrendScreenState extends State<TrendScreen> {
     return options;
   }
 
-  (double, double, double, double) _dialysisDataExtent(MonthlyData data, int dateCount) {
+  (double, double, double, double) _dialysisDataExtent(
+    MonthlyData data,
+    int dateCount,
+  ) {
     double maxY = 100;
     for (final r in data.machineDialysis) {
       if (r.inflow > maxY) maxY = r.inflow;
@@ -216,7 +269,10 @@ class _TrendScreenState extends State<TrendScreen> {
     return (0, (dateCount - 1).toDouble(), 0, maxY);
   }
 
-  (double, double, double, double) _weightDataExtent(List<WeightEntry> entries, int dateCount) {
+  (double, double, double, double) _weightDataExtent(
+    List<WeightEntry> entries,
+    int dateCount,
+  ) {
     double maxY = 100;
     for (final e in entries) {
       if (e.weight > maxY) maxY = e.weight;
@@ -225,7 +281,10 @@ class _TrendScreenState extends State<TrendScreen> {
     return (0, (dateCount - 1).toDouble(), 0, maxY);
   }
 
-  (double, double, double, double) _bpDataExtent(List<BloodPressureEntry> entries, int dateCount) {
+  (double, double, double, double) _bpDataExtent(
+    List<BloodPressureEntry> entries,
+    int dateCount,
+  ) {
     double maxY = 120;
     for (final e in entries) {
       if (e.systolic > maxY) maxY = e.systolic.toDouble();
@@ -282,7 +341,10 @@ class _TrendScreenState extends State<TrendScreen> {
     }
 
     Widget zoomableWeight() {
-      final (dxMin, dxMax, dyMin, dyMax) = _weightDataExtent(data.weight, dateCount);
+      final (dxMin, dxMax, dyMin, dyMax) = _weightDataExtent(
+        data.weight,
+        dateCount,
+      );
       return _ZoomableChart(
         key: const ValueKey('weight'),
         dataMinX: dxMin,
@@ -303,7 +365,10 @@ class _TrendScreenState extends State<TrendScreen> {
     }
 
     Widget zoomableBp() {
-      final (dxMin, dxMax, dyMin, dyMax) = _bpDataExtent(data.bloodPressure, dateCount);
+      final (dxMin, dxMax, dyMin, dyMax) = _bpDataExtent(
+        data.bloodPressure,
+        dateCount,
+      );
       return _ZoomableChart(
         key: const ValueKey('bp'),
         dataMinX: dxMin,
@@ -382,7 +447,8 @@ class _ZoomableChart extends StatefulWidget {
   final double dataMaxX;
   final double dataMinY;
   final double dataMaxY;
-  final Widget Function(double minX, double maxX, double minY, double maxY) childBuilder;
+  final Widget Function(double minX, double maxX, double minY, double maxY)
+  childBuilder;
 
   @override
   State<_ZoomableChart> createState() => _ZoomableChartState();
@@ -405,7 +471,8 @@ class _ZoomableChartState extends State<_ZoomableChart> {
   @override
   void didUpdateWidget(covariant _ZoomableChart oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.dataMaxX != widget.dataMaxX || oldWidget.dataMaxY != widget.dataMaxY) {
+    if (oldWidget.dataMaxX != widget.dataMaxX ||
+        oldWidget.dataMaxY != widget.dataMaxY) {
       _initialized = false;
     }
   }
@@ -449,7 +516,13 @@ class _ZoomableChartState extends State<_ZoomableChart> {
       builder: (context, constraints) {
         final w = constraints.maxWidth;
         final h = constraints.maxHeight;
-        if (w <= 0 || h <= 0) return widget.childBuilder(widget.dataMinX, widget.dataMaxX, widget.dataMinY, widget.dataMaxY);
+        if (w <= 0 || h <= 0)
+          return widget.childBuilder(
+            widget.dataMinX,
+            widget.dataMaxX,
+            widget.dataMinY,
+            widget.dataMaxY,
+          );
         final (minX, maxX, minY, maxY) = _visibleRange(w, h);
 
         return GestureDetector(
@@ -477,8 +550,14 @@ class _ZoomableChartState extends State<_ZoomableChart> {
               final panDataY = visibleH * (details.focalPointDelta.dy / h);
               _centerX += panDataX;
               _centerY += panDataY;
-              _centerX = _centerX.clamp(widget.dataMinX + rangeX / (_scaleX * 2), widget.dataMaxX - rangeX / (_scaleX * 2));
-              _centerY = _centerY.clamp(widget.dataMinY + rangeY / (_scaleY * 2), widget.dataMaxY - rangeY / (_scaleY * 2));
+              _centerX = _centerX.clamp(
+                widget.dataMinX + rangeX / (_scaleX * 2),
+                widget.dataMaxX - rangeX / (_scaleX * 2),
+              );
+              _centerY = _centerY.clamp(
+                widget.dataMinY + rangeY / (_scaleY * 2),
+                widget.dataMaxY - rangeY / (_scaleY * 2),
+              );
             });
           },
           child: widget.childBuilder(minX, maxX, minY, maxY),
@@ -539,7 +618,9 @@ class _WeightChart extends StatelessWidget {
           maxY: visibleMaxY,
           gridData: const FlGridData(show: false),
           titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true)),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: true),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -559,8 +640,12 @@ class _WeightChart extends StatelessWidget {
                 },
               ),
             ),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
           borderData: FlBorderData(show: false),
           lineBarsData: [
@@ -638,7 +723,9 @@ class _BloodPressureChart extends StatelessWidget {
           maxY: visibleMaxY,
           gridData: const FlGridData(show: false),
           titlesData: FlTitlesData(
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true)),
+            leftTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: true),
+            ),
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
@@ -658,8 +745,12 @@ class _BloodPressureChart extends StatelessWidget {
                 },
               ),
             ),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
           ),
           borderData: FlBorderData(show: false),
           lineBarsData: [
@@ -878,7 +969,10 @@ class _DialysisChart extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Colors.green.withValues(alpha: 0.4), Colors.green.withValues(alpha: 0.0)],
+            colors: [
+              Colors.green.withValues(alpha: 0.4),
+              Colors.green.withValues(alpha: 0.0),
+            ],
           ),
         ),
       ),
@@ -904,7 +998,8 @@ class _DialysisChart extends StatelessWidget {
       }
     }
 
-    final showLegend = selectedSeriesId != 'net' &&
+    final showLegend =
+        selectedSeriesId != 'net' &&
         (selectedSeriesId == null ||
             selectedSeriesId!.startsWith('machine_') ||
             selectedSeriesId!.startsWith('manual_'));
@@ -953,7 +1048,9 @@ class _DialysisChart extends StatelessWidget {
               maxY: visibleMaxY,
               gridData: const FlGridData(show: false),
               titlesData: FlTitlesData(
-                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true)),
+                leftTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: true),
+                ),
                 bottomTitles: AxisTitles(
                   sideTitles: SideTitles(
                     showTitles: true,
@@ -973,8 +1070,12 @@ class _DialysisChart extends StatelessWidget {
                     },
                   ),
                 ),
-                rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                rightTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
+                topTitles: const AxisTitles(
+                  sideTitles: SideTitles(showTitles: false),
+                ),
               ),
               borderData: FlBorderData(show: false),
               lineBarsData: displayBars,

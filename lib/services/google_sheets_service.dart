@@ -42,18 +42,34 @@ class GoogleSheetsService {
         return;
       }
 
-      // 여기까지 왔다면: 삭제되었거나, 다른 폴더에 있거나, 정보 조회 실패 → 새로 생성
+      // 여기까지 왔다면: 삭제되었거나, 다른 폴더에 있거나, 정보 조회 실패 → Drive에서 동일 제목 검색
       await _prefs?.remove(_sheetIdKey(monthKey));
     }
 
     final folderId = await _ensureAppFolder();
+    final dialysisFileTitle = 'Dialysis $monthKey';
+    if (folderId.isNotEmpty) {
+      final foundId = await _findSpreadsheetInAppFolderByName(
+        folderId,
+        dialysisFileTitle,
+      );
+      if (foundId.isNotEmpty) {
+        await _prefs?.setString(_sheetIdKey(monthKey), foundId);
+        // ignore: avoid_print
+        print(
+          '[Sheets] ensureCurrentMonthSheet: Drive에서 기존 투석데이터 파일 사용 sheetId=$foundId',
+        );
+        return;
+      }
+    }
+
     // 새 시트 생성 시 필요하면 재인증 유도(promptIfNecessary: true)해 데이터 반영 보장
     final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
       return;
     }
     final spreadsheet = Spreadsheet(
-      properties: SpreadsheetProperties(title: 'Dialysis $monthKey'),
+      properties: SpreadsheetProperties(title: dialysisFileTitle),
       sheets: [
         Sheet(properties: SheetProperties(title: 'dialysis_machine')),
         Sheet(properties: SheetProperties(title: 'dialysis_manual')),
@@ -101,7 +117,7 @@ class GoogleSheetsService {
       // 여기까지 왔다면: 삭제되었거나, 다른 폴더에 있거나, 정보 조회 실패 → 새로 생성
       await _prefs?.remove('inventorySheetId');
       // ignore: avoid_print
-      print('[Sheets] ensureInventorySheet: 기존 ID 무효 → 재생성 준비');
+      print('[Sheets] ensureInventorySheet: 기존 ID 무효 → Drive에서 동일 제목 검색');
     }
     // ignore: avoid_print
     print('[Sheets] ensureInventorySheet: 앱 폴더 확인 중...');
@@ -110,6 +126,21 @@ class GoogleSheetsService {
     print(
       '[Sheets] ensureInventorySheet: folderId=${folderId.isEmpty ? "없음" : folderId}',
     );
+    if (folderId.isNotEmpty) {
+      final foundId = await _findSpreadsheetInAppFolderByName(
+        folderId,
+        _inventoryFileTitle,
+      );
+      if (foundId.isNotEmpty) {
+        await _prefs?.setString('inventorySheetId', foundId);
+        await _ensureSheetTabsExist(foundId, ['owned', 'pending', 'defective']);
+        // ignore: avoid_print
+        print(
+          '[Sheets] ensureInventorySheet: Drive에서 기존 재고관리 파일 사용 sheetId=$foundId',
+        );
+        return foundId;
+      }
+    }
     final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
       // ignore: avoid_print
@@ -117,7 +148,7 @@ class GoogleSheetsService {
       return '';
     }
     final spreadsheet = Spreadsheet(
-      properties: SpreadsheetProperties(title: '투석물품 재고관리'),
+      properties: SpreadsheetProperties(title: _inventoryFileTitle),
       sheets: [
         Sheet(properties: SheetProperties(title: 'owned')),
         Sheet(properties: SheetProperties(title: 'pending')),
@@ -142,8 +173,59 @@ class GoogleSheetsService {
     return sheetId;
   }
 
+  /// 앱 폴더(투석결과App) 안에 지정한 제목의 스프레드시트가 있으면 그 ID를 반환한다.
+  Future<String> _findSpreadsheetInAppFolderByName(
+    String folderId,
+    String fileName,
+  ) async {
+    final driveApi = await _driveApi(promptIfNecessary: false);
+    if (driveApi == null) return '';
+    try {
+      // Drive API 쿼리에서 작은따옴표 이스케이프: ' → \'
+      final escapedName = fileName.replaceAll("'", r"\'");
+      final response = await driveApi.files.list(
+        q:
+            "'$folderId' in parents "
+            "and name='$escapedName' "
+            "and mimeType='application/vnd.google-apps.spreadsheet' "
+            "and trashed=false",
+        spaces: 'drive',
+        $fields: 'files(id, name)',
+      );
+      if (response.files != null && response.files!.isNotEmpty) {
+        final id = response.files!.first.id ?? '';
+        if (id.isNotEmpty) {
+          // ignore: avoid_print
+          print(
+            '[Sheets] _findSpreadsheetInAppFolderByName: "$fileName" 발견 id=$id',
+          );
+          return id;
+        }
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('[Sheets] _findSpreadsheetInAppFolderByName 예외: $e');
+    }
+    return '';
+  }
+
+  Future<String> _findSettingsFileInAppFolder(String folderId) async {
+    final id = await _findSpreadsheetInAppFolderByName(
+      folderId,
+      _settingsFileTitle,
+    );
+    if (id.isNotEmpty) {
+      // ignore: avoid_print
+      print('[Sheets] _findSettingsFileInAppFolder: 기존 설정 파일 발견 id=$id');
+    }
+    return id;
+  }
+
+  static const _inventoryFileTitle = '투석물품 재고관리';
+
   /// 설정 전용 스프레드시트 파일(투석 설정)을 확인·생성한다.
   /// - 저장 위치: 투석결과App 폴더 안 "투석 설정" 파일
+  /// - prefs에 ID가 없으면 먼저 Drive에서 동일 제목 파일을 찾고, 없을 때만 새로 생성
   Future<String> ensureSettingsSheet() async {
     _prefs ??= await SharedPreferences.getInstance();
     final existingId = _prefs?.getString(_settingsFilePrefKey);
@@ -160,9 +242,22 @@ class GoogleSheetsService {
       }
       await _prefs?.remove(_settingsFilePrefKey);
       // ignore: avoid_print
-      print('[Sheets] ensureSettingsSheet: 기존 ID 무효 → 재생성 준비');
+      print('[Sheets] ensureSettingsSheet: 기존 ID 무효 → Drive에서 동일 제목 파일 검색');
     }
+
     final folderId = await _ensureAppFolder();
+    if (folderId.isNotEmpty) {
+      final foundId = await _findSettingsFileInAppFolder(folderId);
+      if (foundId.isNotEmpty) {
+        await _prefs?.setString(_settingsFilePrefKey, foundId);
+        // ignore: avoid_print
+        print(
+          '[Sheets] ensureSettingsSheet: Drive에서 기존 설정 파일 사용 sheetId=$foundId',
+        );
+        return foundId;
+      }
+    }
+
     final sheetsApi = await _sheetsApi(promptIfNecessary: true);
     if (sheetsApi == null) {
       // ignore: avoid_print

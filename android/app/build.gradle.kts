@@ -43,3 +43,8 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // ML Kit 한국어 텍스트 인식 (기계투석 OCR) - 플러그인은 compileOnly이므로 앱에서 implementation 추가
+    implementation("com.google.mlkit:text-recognition-korean:16.0.1")
+}
