@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_colors.dart';
 import '../services/google_sheets_service.dart';
 import '../state/app_state.dart';
 
@@ -317,9 +318,9 @@ class _BagRadio extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          color: value == groupValue ? Colors.blue.shade50 : Colors.transparent,
+          color: value == groupValue ? AppColors.primary.withOpacity(0.15) : Colors.transparent,
           border: Border.all(
-            color: value == groupValue ? Colors.blue : Colors.grey.shade400,
+            color: value == groupValue ? AppColors.primary : Colors.grey.shade400,
           ),
           borderRadius: BorderRadius.circular(20),
         ),

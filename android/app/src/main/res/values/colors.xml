@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#007B8F</color>
+    <!-- Android 12+ 시스템 스플래시: 단색만 지원하므로 브랜드 색으로 전체화면 표시 -->
+    <color name="splash_screen_background">#007B8F</color>
+</resources>

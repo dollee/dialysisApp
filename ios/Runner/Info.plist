@@ -1,74 +1,76 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>$(DEVELOPMENT_LANGUAGE)</string>
-	<key>CFBundleDisplayName</key>
-	<string>Dialysis App</string>
-	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleInfoDictionaryVersion</key>
-	<string>6.0</string>
-	<key>CFBundleName</key>
-	<string>dialysis_app</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>$(FLUTTER_BUILD_NAME)</string>
-	<key>CFBundleSignature</key>
-	<string>????</string>
-	<key>CFBundleVersion</key>
-	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
-	<key>GIDClientID</key>
-	<string>577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1.apps.googleusercontent.com</string>
-	<key>GIDReversedClientID</key>
-	<string>com.googleusercontent.apps.577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1</string>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1</string>
-			</array>
-		</dict>
-	</array>
-	<key>NSHealthShareUsageDescription</key>
-	<string>체중과 혈압 데이터를 읽기 위해 건강 데이터 접근이 필요합니다.</string>
-	<key>NSHealthUpdateUsageDescription</key>
-	<string>체중과 혈압 데이터를 저장하기 위해 건강 데이터 접근이 필요합니다.</string>
-	<key>NSContactsUsageDescription</key>
-	<string>배송 요청 전화번호를 주소록에서 불러오기 위해 연락처 접근이 필요합니다.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>기계투석 자동입력을 위해 카메라 접근이 필요합니다.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>기계투석 자동입력을 위해 사진 접근이 필요합니다.</string>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
-	<key>UILaunchStoryboardName</key>
-	<string>LaunchScreen</string>
-	<key>UIMainStoryboardFile</key>
-	<string>Main</string>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-</dict>
+	<dict>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>CFBundleDevelopmentRegion</key>
+		<string>$(DEVELOPMENT_LANGUAGE)</string>
+		<key>CFBundleDisplayName</key>
+		<string>Dialysis App</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>dialysis_app</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>GIDClientID</key>
+		<string>577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1.apps.googleusercontent.com</string>
+		<key>GIDReversedClientID</key>
+		<string>com.googleusercontent.apps.577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1</string>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.577936328092-1d04sl5u163l7sas223b8cvs8gl0fil1</string>
+				</array>
+			</dict>
+		</array>
+		<key>NSHealthShareUsageDescription</key>
+		<string>체중과 혈압 데이터를 읽기 위해 건강 데이터 접근이 필요합니다.</string>
+		<key>NSHealthUpdateUsageDescription</key>
+		<string>체중과 혈압 데이터를 저장하기 위해 건강 데이터 접근이 필요합니다.</string>
+		<key>NSContactsUsageDescription</key>
+		<string>배송 요청 전화번호를 주소록에서 불러오기 위해 연락처 접근이 필요합니다.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>기계투석 자동입력을 위해 카메라 접근이 필요합니다.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>기계투석 자동입력을 위해 사진 접근이 필요합니다.</string>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<key>UIStatusBarHidden</key>
+		<false/>
+	</dict>
 </plist>

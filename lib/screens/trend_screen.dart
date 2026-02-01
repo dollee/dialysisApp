@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../theme/app_colors.dart';
 import '../services/google_sheets_service.dart';
 import '../state/app_state.dart';
 
@@ -650,7 +651,7 @@ class _WeightChart extends StatelessWidget {
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
-              color: Colors.blue,
+              color: AppColors.primary,
               spots: spots,
               isCurved: true,
               barWidth: 3,
@@ -755,14 +756,14 @@ class _BloodPressureChart extends StatelessWidget {
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
-              color: Colors.red,
+              color: AppColors.error,
               spots: systolicSpots,
               isCurved: true,
               barWidth: 3,
               dotData: const FlDotData(show: false),
             ),
             LineChartBarData(
-              color: Colors.blueGrey,
+              color: AppColors.primary,
               spots: diastolicSpots,
               isCurved: true,
               barWidth: 3,
@@ -834,9 +835,9 @@ class _DialysisChart extends StatelessWidget {
     }
 
     final lineBars = <LineChartBarData>[];
-    // 투입량: 파랑 계열, 배약량: 주황 계열로 구분
-    const colorInflow = Colors.blue;
-    const colorOutflow = Colors.deepOrange;
+    // 투입량: 메인(딥 틸), 배약량: 보조(웜 오렌지)로 구분
+    const colorInflow = AppColors.primary;
+    const colorOutflow = AppColors.secondary;
 
     for (var s = 1; s <= maxMachineSession; s++) {
       final session = s;
@@ -959,7 +960,7 @@ class _DialysisChart extends StatelessWidget {
     }).toList();
     lineBars.add(
       LineChartBarData(
-        color: Colors.green,
+        color: AppColors.success,
         spots: netSpots,
         isCurved: true,
         barWidth: 3,
@@ -970,8 +971,8 @@ class _DialysisChart extends StatelessWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Colors.green.withValues(alpha: 0.4),
-              Colors.green.withValues(alpha: 0.0),
+              AppColors.success.withValues(alpha: 0.4),
+              AppColors.success.withValues(alpha: 0.0),
             ],
           ),
         ),

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ (API 31+) 전용: SplashScreen API는 "단색 배경 + 가운데 아이콘(원형 마스크)"만 지원합니다.
+  전체화면 이미지는 플랫폼에서 지원하지 않습니다. (developer.android.com/develop/ui/views/launch/splash-screen)
+  → Flutter 쪽 SplashScreen(assets/splash.png 전체화면)으로 이어지도록, 아이콘은 배경과 동일 색(splash_icon_solid)으로 숨김.
+-->
+<resources>
+    <!-- SplashActivity(런처): Android 12+에서 시스템 스플래시를 투명하게 해 전체화면 drawable 노출 -->
+    <style name="SplashTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:windowDisablePreview">true</item>
+        <!-- 배경/아이콘 모두 투명 → 특정 색 화면 없이 바로 windowBackground(스플래시 이미지)만 노출 -->
+        <item name="android:windowSplashScreenBackground">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+    <!-- MainActivity(Flutter) 시작 시에도 전체화면 drawable로 이어지도록 windowBackground 사용 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    </style>
+    <!-- Theme applied to the Android Window as soon as the process has started.
+         This theme determines the color of the Android Window while your
+         Flutter UI initializes, as well as behind your Flutter UI while its
+         running.
+         
+         This Theme is only used starting with V2 of Flutter's Android embedding. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

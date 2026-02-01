@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../theme/app_colors.dart';
 import '../state/app_state.dart';
 import '../widgets/contact_picker.dart';
 import 'debug_log_screen.dart';
@@ -378,7 +379,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         '배송요청 게이트: ${_deliveryGate ? 'ON' : 'OFF'}',
-                        style: const TextStyle(color: Colors.black54),
+                        style: const TextStyle(color: AppColors.textSecondary),
                       ),
                     ),
                     const SizedBox(height: 8),
